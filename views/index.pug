@@ -1,0 +1,30 @@
+doctype
+html(lang="ja")
+  head
+    meta(charset="utf-8")
+    meta(name="viewport", content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0")
+    meta(name="description", content="")
+    script(src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.1/js/bootstrap.min.js")
+    script(src="https://code.jquery.com/jquery-3.3.1.slim.min.js"
+      integrity="sha256-3edrmyuQ0w65f8gfBsqowzjJe2iM6n0nKciPUp8y+7E="
+      crossorigin="anonymous")
+    script(src="https://cdn.jsdelivr.net/npm/signature_pad@2.3.2/dist/signature_pad.min.js")
+    style(type="text/css").
+      table {
+        width: 100%
+      }
+body
+  .container
+    canvas#canvas
+    button#btn.btn.btn-primary.btn-block(type="button") Share
+    script.
+      const canvas = document.querySelector('#canvas');
+      const signaturePad = new SignaturePad(canvas, {
+        backgroundColor: 'rgb(238,238,238)',
+      });
+
+      $(window).on('load', function(){
+        canvas.setAttribute('width', $('.container').width());
+        canvas.setAttribute('height', window.innerHeight - $('#btn').outerHeight() - 10);
+        signaturePad.clear();
+      });

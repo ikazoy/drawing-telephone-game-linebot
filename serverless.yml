@@ -1,0 +1,33 @@
+service: liff-test
+
+# 実行環境に関する設定
+provider:
+  name: aws
+  runtime: nodejs8.10
+  region: ap-northeast-1
+
+# 利用するプラグインについて
+plugins:
+  - serverless-offline
+
+# デプロイ時のパッケージの内容について
+# package:
+#   include:
+#     - src/**
+
+# lambdaを実行するトリガの設定。今回はAPI Gatewayのルーティング設定
+functions:
+  index:
+    handler: index.handler
+    events:
+      - http:
+          path: /
+          method: get
+          cors: true
+  saveImage:
+    handler: index.handler
+    events:
+      - http:
+          path: /saveImage
+          method: post
+          cors: true
