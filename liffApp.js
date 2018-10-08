@@ -5,8 +5,8 @@ const path = require('path');
 // const logger = require('morgan');
 // const sassMiddleware = require('node-sass-middleware');
 
-const indexRouter = require('./routes/index');
-const saveImageRouter = require('./routes/lineWebhook');
+const indexRouter = require('./routes/liff');
+// const saveImageRouter = require('./routes/lineWebhook');
 
 const app = express();
 
@@ -27,7 +27,7 @@ app.use(express.json());
 // app.use(express.static(path.join(__dirname, 'public')));
 
 app.use('/', indexRouter);
-app.use('/line/webhook', saveImageRouter);
+// app.use('/line/webhook', saveImageRouter);
 
 // catch 404 and forward to error handler
 app.use((req, res, next) => {

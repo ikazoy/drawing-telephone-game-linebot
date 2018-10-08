@@ -15,19 +15,25 @@ plugins:
 #   include:
 #     - src/**
 
-# lambdaを実行するトリガの設定。今回はAPI Gatewayのルーティング設定
 functions:
-  index:
-    handler: index.handler
+  webhook:
+    handler: messageIndex.handler
     events:
       - http:
-          path: /
-          method: get
-          cors: true
-  saveImage:
-    handler: index.handler
-    events:
-      - http:
-          path: /saveImage
+          path: /webhook
           method: post
           cors: true
+  openLiff:
+    handler: liffIndex.handler
+    events:
+      - http:
+          path: /liff
+          method: get
+          cors: true
+  # saveImage:
+  #   handler: index.handler
+  #   events:
+  #     - http:
+  #         path: /saveImage
+  #         method: post
+  #         cors: true
