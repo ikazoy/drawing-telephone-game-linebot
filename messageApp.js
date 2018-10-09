@@ -1,6 +1,9 @@
 const createError = require('http-errors');
 const express = require('express');
 const line = require('@line/bot-sdk');
+const Firestore = require('@google-cloud/firestore');
+const admin = require('firebase-admin');
+const db = require('./libs/firebaseInit');
 
 // eslint-disable-next-line
 const accessToken = 'pa0zKktb+fZeGVzo3oYS7NfCn6H3973uf31ScxpNA9bdSS1/yaia1Fe9NKce+B9PMYs8rCOZaR8PUab6Y7wweF3HWmCkuP/LPCHxD7aUIq5z/+fIIyodhDbMGS/9aIKIr+pTv6UGbseDyti/kATTOwdB04t89/1O/w1cDnyilFU=';
@@ -19,11 +22,74 @@ const replyText = (token, texts) => {
   );
 };
 
+async function getMemberProfile(memberIds, bundleId, type) {
+  const res = {};
+  // eslint-disable-next-line
+  for (const memberId of memberIds) {
+    let profile;
+    if (type === 'group') {
+      console.log('memberID', memberId);
+      console.log('bundleId', bundleId);
+      // eslint-disable-next-line
+      profile = await client.getGroupMemberProfile(bundleId, memberId);
+    } if (type === 'room') {
+      console.log('memberID', memberId);
+      console.log('bundleId', bundleId);
+      // eslint-disable-next-line
+      profile = await client.getRoomMemberProfile(bundleId, memberId);
+    }
+    res[memberId] = profile;
+  }
+  return res;
+}
+
 async function handleText(message, replyToken, source) {
+  console.log('message', message);
+  console.log('source', source);
   const { text } = message;
   const liffUrl = 'line://app/1613121893-RlAO1NqA';
   if (/^url$/.test(text)) {
     return replyText(replyToken, liffUrl);
+  }
+  if (/^参加$/.test(text)) {
+    if (source.type === 'user') {
+      return replyText(replyToken, 'グループもしくはルームで遊んでください');
+    }
+    // 処理
+    const gameId = `${(source.groupId || source.roomId)}-game`;
+    const docRef = db.collection('games').doc(gameId);
+    // const res = await docRef.update({
+    //   users: Firestore.FieldValue.arrayUnion('a'),
+    // });
+    await docRef.update({
+      regions: admin.firestore.FieldValue.arrayUnion('greater_virginia'),
+    });
+    return replyText(replyToken, 'test');
+  }
+  if (/^開始$/.test(text)) {
+    let memberIds;
+    let members;
+    if (source.type === 'user') {
+      return replyText(replyToken, 'グループもしくはルームで遊んでください');
+    } if (source.type === 'group') {
+      // 普通のアカウントでは使えない
+      memberIds = await client.getGroupMemberIds(source.groupId);
+      console.log('memberIds', memberIds);
+      members = await getMemberProfile(memberIds, source.groupId, 'group');
+    } if (source.type === 'room') {
+      console.log('source.roomId', source.roomId);
+      try {
+        // 普通のアカウントでは使えない
+        memberIds = await client.getRoomMemberIds(source.roomId);
+      } catch (err) {
+        console.log('error', err);
+      }
+
+      console.log('memberIds', memberIds);
+      members = await getMemberProfile(memberIds, source.roomId, 'room');
+    }
+    console.log('members', members);
+    return replyText();
   }
   return replyText(replyToken, message.text);
 }

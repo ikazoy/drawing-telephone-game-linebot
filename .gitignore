@@ -59,3 +59,6 @@ typings/
 
 # next.js build output
 .next
+
+firestore-admin-key.json
+firestore-key.json

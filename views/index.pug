@@ -14,9 +14,11 @@ html(lang="ja")
         width: 100%
       }
 body
+  //- eraser
   .container
     canvas#canvas
-    button#btn.btn.btn-primary.btn-block(type="button") Share
+    button#btn.btn.btn-primary.btn-block(type="button") Submit
+    button#undo.btn.btn-primary.btn-block(type="button") Undo
     script.
       const canvas = document.querySelector('#canvas');
       const signaturePad = new SignaturePad(canvas, {
@@ -27,4 +29,11 @@ body
         canvas.setAttribute('width', $('.container').width());
         canvas.setAttribute('height', window.innerHeight - $('#btn').outerHeight() - 10);
         signaturePad.clear();
+        document.getElementById('undo').addEventListener('click', function () {
+          const data = signaturePad.toData();
+          if (data) {
+            data.pop(); // remove the last dot or line
+            signaturePad.fromData(data);
+          }
+        });
       });
