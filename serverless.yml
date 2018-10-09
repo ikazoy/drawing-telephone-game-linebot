@@ -13,6 +13,11 @@ provider:
         Resource:
           - { "Fn::Join" : ["", ["arn:aws:s3:::", { "Ref" : "ServerlessDeploymentBucket" } ]]}
           - "arn:aws:s3:::drawing-telephone-game-linebot-images/*"
+      - Effect: "Allow"
+        Action:
+          - "lambda:InvokeFunction"
+        Resource:
+          - "*"
 
 # 利用するプラグインについて
 plugins:

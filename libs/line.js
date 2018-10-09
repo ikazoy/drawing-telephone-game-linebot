@@ -9,6 +9,10 @@ const config = {
 };
 const client = new line.Client(config);
 
+function serialize(obj) {
+  return `?${Object.keys(obj).reduce((a, k) => { a.push(`${k}=${encodeURIComponent(obj[k])}`); return a; }, []).join('&')}`;
+}
+
 const replyText = (token, texts) => {
   const ts = Array.isArray(texts) ? texts : [texts];
   return client.replyMessage(
@@ -34,10 +38,27 @@ const getMemberProfile = async (memberId, bundleId, type) => {
   }
   return profile;
 };
+const buildLiffUrl = (bundleId, userId, currentIndex) => {
+  const liffUrl = 'line://app/1613121893-RlAO1NqA';
+  const params = {};
+  if (bundleId != null) {
+    params.bundleId = bundleId;
+  }
+  if (userId != null) {
+    params.userId = userId;
+  }
+  if (currentIndex != null) {
+    params.currentIndex = currentIndex;
+  }
+  return `${liffUrl}${serialize(params)}`;
+};
+
 
 module.exports = {
   config,
+  client,
   replyText,
   pushMessage,
   getMemberProfile,
+  buildLiffUrl,
 };

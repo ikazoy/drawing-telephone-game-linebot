@@ -3,28 +3,20 @@ const express = require('express');
 const line = require('@line/bot-sdk');
 const admin = require('firebase-admin');
 const _ = require('underscore');
+const s3Lib = require('./libs/s3');
 
 const firestore = require('./libs/firestore');
 const lineLib = require('./libs/line');
 
 
-function serialize(obj) {
-  return `?${Object.keys(obj).reduce((a, k) => { a.push(`${k}=${encodeURIComponent(obj[k])}`); return a; }, []).join('&')}`;
-}
-
-function buildLiffUrl(bundleId, userId, currentIndex) {
-  const liffUrl = 'line://app/1613121893-RlAO1NqA';
-  const params = {};
-  if (bundleId != null) {
-    params.bundleId = bundleId;
+async function isGuessingAnswerer(bundleId, userId) {
+  const gameDocRef = firestore.latestGameDocRef(`${bundleId}-game`);
+  const docSnapshot = await gameDocRef.get();
+  if (docSnapshot.exists) {
+    const data = await docSnapshot.data();
+    return (data.userIds[data.currentIndex] === userId);
   }
-  if (userId != null) {
-    params.userId = userId;
-  }
-  if (currentIndex != null) {
-    params.currentIndex = currentIndex;
-  }
-  return `${liffUrl}${serialize(params)}`;
+  return false;
 }
 
 async function handleText(message, replyToken, source) {
@@ -32,9 +24,8 @@ async function handleText(message, replyToken, source) {
   console.log('source', source);
   const { text } = message;
   if (/^url$/.test(text)) {
-    return lineLib.replyText(replyToken, buildLiffUrl());
-  }
-  if (/^参加$/.test(text)) {
+    return lineLib.replyText(replyToken, lineLib.buildLiffUrl());
+  } if (/^参加$/.test(text)) {
     if (source.type === 'user') {
       return lineLib.replyText(replyToken, 'グループもしくはルームで遊んでください');
     }
@@ -64,14 +55,17 @@ async function handleText(message, replyToken, source) {
     if (uids2dn != null) {
       displayNames = uids2dn.map(el => Object.values(el)[0]);
     }
+    // set users collection
+    const userDocRef = firestore.usersDocRef(source.userId);
+    await userDocRef.set({
+      bundleId: firestore.extractBundleId(source),
+    });
     return lineLib.replyText(replyToken, `参加を受け付けました。\n\n現在の参加者一覧\n${displayNames.join('\n')}`);
-  }
-  // TODO: 終了
-  if (/^終了$/.test(text)) {
+  } if (/^終了$/.test(text)) {
+    // TODO: 終了
     const gameDocRef = firestore.latestGameDocRefFromSource(source);
     return lineLib.replyText(replyToken, 'ゲームを終了しました');
-  }
-  if (/^開始$/.test(text)) {
+  } if (/^開始$/.test(text)) {
     if (source.type === 'user') {
       return lineLib.replyText(replyToken, 'グループもしくはルームで遊んでください');
     }
@@ -111,15 +105,54 @@ async function handleText(message, replyToken, source) {
     }
     console.log('orderedPlayers', orderedPlayers);
     // TODO: お題を取得
-    lineLib.pushMessage(firstPlayerUserId, `お題はこちら: ハチドリ\nクリックしてから60秒以内に絵を書いてください。\n${buildLiffUrl(firestore.extractBundleId(source), source.userId, 0)}`);
+    lineLib.pushMessage(firstPlayerUserId, `お題はこちら: ハチドリ\nクリックしてから60秒以内に絵を書いてください。\n${lineLib.buildLiffUrl(firestore.extractBundleId(source), firstPlayerUserId, 0)}`);
     const messages = [
       `ゲームを開始します。\n\n順番はこちらです。\n${orderedPlayers.join('\n')}`,
       `${orderedPlayers[0]}さんにお題を送信しました。\n60秒以内に絵を書いてください`,
     ];
     return lineLib.replyText(replyToken, messages);
   }
+  // 回答の場合
+  if (source.type === 'user' && isGuessingAnswerer(firestore.latestBundleIdOfUser(source.userId), source.userId)) {
+    // s3にtextfileを保存
+    console.log('now the user is guessing answerer');
+    console.log('source', source);
+    const directory = firestore.extractBundleId(source);
+    console.log('source2', source);
+    console.log(firestore.extractBundleId(source));
+    const currentIndex = await firestore.currentIndex(firestore.extractBundleId(source));
+    const fileName = (`${currentIndex}-${source.userId}`);
+    // TODO: bucket nameをserverless.ymlと共通化する
+    // https://serverless.com/framework/docs/providers/aws/guide/variables#reference-variables-in-javascript-files
+    // TODO: bucketのアクセス権限を治す
+    // const bucketName = 'drawing-telephone-game-linebot-images-test';
+    const fileKey = `${directory}/${fileName}.txt`;
+    const params = {
+      Bucket: s3Lib.bucketName,
+      Key: fileKey,
+      Body: text,
+      ACL: 'public-read',
+    };
+    await s3Lib.s3.putObject(params, (err, data) => {
+      if (err) {
+        console.log('err on liff.js putObject', err);
+        // response = res.json({
+        //   success: false,
+        // });
+      } else {
+        console.log('data on liff.js putObject', data);
+        // response = res.json({
+        //   success: true,
+        //   filePath: `${s3Lib.s3BaseUrl}/${s3Lib.bucketName}/${fileKey}`,
+        // });
+      }
+    });
+    return lineLib.replyText(replyToken, '回答ありがとうございました');
+  }
+
   return lineLib.replyText(replyToken, message.text);
 }
+
 
 function handleEvent(event) {
   if (event.type !== 'message' || event.message.type !== 'text') {
@@ -162,30 +195,7 @@ function handleEvent(event) {
   // return replyText(event.replyToken, event.message.text);
 }
 
-// const cookieParser = require('cookie-parser');
-// const logger = require('morgan');
-// const sassMiddleware = require('node-sass-middleware');
-
-// const indexRouter = require('./routes/webhook');
-// const saveImageRouter = require('./routes/lineWebhook');
-
 const app = express();
-
-// view engine setup
-// app.set('views', path.join(__dirname, 'views'));
-// app.set('view engine', 'pug');
-
-// app.use(logger('dev'));
-// app.use(express.json());
-// app.use(express.urlencoded({ extended: false }));
-// app.use(cookieParser());
-// app.use(sassMiddleware({
-//   src: path.join(__dirname, 'public'),
-//   dest: path.join(__dirname, 'public'),
-//   indentedSyntax: true, // true = .sass and false = .scss
-//   sourceMap: true,
-// }));
-// app.use(express.static(path.join(__dirname, 'public')));
 
 app.post('/webhook', line.middleware(lineLib.config), async (req, res) => {
   try {
@@ -200,16 +210,5 @@ app.post('/webhook', line.middleware(lineLib.config), async (req, res) => {
 app.use((req, res, next) => {
   next(createError(404));
 });
-
-// error handler
-// app.use((err, req, res, next) => {
-//   // set locals, only providing error in development
-//   res.locals.message = err.message;
-//   res.locals.error = req.app.get('env') === 'development' ? err : {};
-
-//   // render the error page
-//   res.status(err.status || 500);
-//   res.render('error');
-// });
 
 module.exports = app;

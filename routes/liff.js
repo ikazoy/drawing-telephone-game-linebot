@@ -1,7 +1,7 @@
 const express = require('express');
-const aws = require('aws-sdk');
+const s3Lib = require('../libs/s3');
 
-const s3 = new aws.S3({ apiVersion: '2006-03-01', region: 'ap-northeast-1' });
+const { s3 } = s3Lib;
 
 const router = express.Router();
 
@@ -26,6 +26,8 @@ router.get('/liff', (req, res, next) => {
   res.render('index', { title: 'Express' });
 });
 
+
+
 router.post('/saveimage', async (req, res, text) => {
   const { image } = req.body;
   const directory = req.body.bundleId || 'noBundleId';
@@ -36,14 +38,12 @@ router.post('/saveimage', async (req, res, text) => {
   // https://serverless.com/framework/docs/providers/aws/guide/variables#reference-variables-in-javascript-files
   // TODO: bucketのアクセス権限を治す
   // const bucketName = 'drawing-telephone-game-linebot-images-test';
-  const bucketName = 'drawing-telephone-game-linebot-images';
   const fileKey = `${directory}/${fileName}.jpeg`;
   const params = {
-    Bucket: bucketName,
+    Bucket: s3Lib.bucketName,
     Key: fileKey,
     ContentType: imageBuffer.type,
     Body: imageBuffer.data,
-    // TODO: fix me
     ACL: 'public-read',
   };
   await s3.putObject(params, (err, data) => {
@@ -57,7 +57,7 @@ router.post('/saveimage', async (req, res, text) => {
       console.log('data on liff.js putObject', data);
       response = res.json({
         success: true,
-        filePath: `https://s3-ap-northeast-1.amazonaws.com/${bucketName}/${fileKey}`,
+        filePath: `${s3Lib.s3BaseUrl}/${s3Lib.bucketName}/${fileKey}`,
       });
     }
     return response;
