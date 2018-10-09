@@ -5,6 +5,7 @@ provider:
   name: aws
   runtime: nodejs8.10
   region: ap-northeast-1
+  profile: giboshi31
 
 # 利用するプラグインについて
 plugins:
@@ -30,10 +31,16 @@ functions:
           path: /liff
           method: get
           cors: true
-  # saveImage:
-  #   handler: index.handler
-  #   events:
-  #     - http:
-  #         path: /saveImage
-  #         method: post
-  #         cors: true
+  saveImage:
+    handler: liffIndex.handler
+    events:
+      - http:
+          path: /saveimage
+          method: post
+          cors: true
+# resources:
+#   Resources:
+#     S3BucketImages:
+#       Type: AWS::S3::Bucket
+#       Properties:
+#         BucketName: drawing-telephone-game-linebot-images

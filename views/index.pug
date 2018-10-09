@@ -5,16 +5,16 @@ html(lang="ja")
     meta(name="viewport", content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0")
     meta(name="description", content="")
     script(src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.1/js/bootstrap.min.js")
-    script(src="https://code.jquery.com/jquery-3.3.1.slim.min.js"
-      integrity="sha256-3edrmyuQ0w65f8gfBsqowzjJe2iM6n0nKciPUp8y+7E="
-      crossorigin="anonymous")
+    script(src="https://code.jquery.com/jquery-3.3.1.min.js")
     script(src="https://cdn.jsdelivr.net/npm/signature_pad@2.3.2/dist/signature_pad.min.js")
+    script(src="https://d.line-scdn.net/liff/1.0/sdk.js")
+    script(src="https://unpkg.com/axios/dist/axios.min.js")
     style(type="text/css").
       table {
         width: 100%
       }
 body
-  //- eraser
+  //- TODO: timer
   .container
     canvas#canvas
     button#btn.btn.btn-primary.btn-block(type="button") Submit
@@ -29,11 +29,53 @@ body
         canvas.setAttribute('width', $('.container').width());
         canvas.setAttribute('height', window.innerHeight - $('#btn').outerHeight() - 10);
         signaturePad.clear();
+        liff.init(function (data) {});
         document.getElementById('undo').addEventListener('click', function () {
           const data = signaturePad.toData();
           if (data) {
             data.pop(); // remove the last dot or line
             signaturePad.fromData(data);
+          }
+        });
+      });
+      $('#btn').on('click', function() {
+        const params = (new URL(document.location)).searchParams;
+        const bundleId = (params != null && params.has("bundleId")) ? params.get("bundleId") : null;
+        const currentIndex = (params != null && params.has("currentIndex")) ? params.get("currentIndex") : null;
+
+        $.ajax({
+          type: 'POST',
+          url: '/saveimage',
+          data: {
+            'image': signaturePad.toDataURL('image/jpeg'),
+            'bundleId': bundleId,
+            'currentIndex': currentIndex,
+          },
+          success: function (res, status) {
+            liff.getProfile().then(function (profile) {
+              liff.sendMessages([
+                {
+                  type: 'image',
+                  originalContentUrl: 'https://' + document.domain + '/imgs/' + res + '.jpg',
+                  previewImageUrl: 'https://' + document.domain + '/imgs/' + res + '_240.jpg'
+                },
+                {
+                  type: 'text',
+                  text: 'From:' + profile.displayName
+                }
+              ]).then(function () {
+                liff.closeWindow();
+              }).catch(function (error) {
+                window.alert('Error sending message: ' + error.message);
+              });
+            }).catch(function (error) {
+                window.alert("Error getting profile: " + error.message);
+            });
+          },
+          error: function (res) {
+            window.alert('Error saving image: ' + res.status);
+          },
+          complete: function(data) {
           }
         });
       });
