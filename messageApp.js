@@ -1,8 +1,8 @@
 const createError = require('http-errors');
 const express = require('express');
 const line = require('@line/bot-sdk');
-const Firestore = require('@google-cloud/firestore');
 const admin = require('firebase-admin');
+const _ = require('underscore');
 const db = require('./libs/firebaseInit');
 
 // eslint-disable-next-line
@@ -22,74 +22,130 @@ const replyText = (token, texts) => {
   );
 };
 
-async function getMemberProfile(memberIds, bundleId, type) {
+const pushMessage = (to, texts) => {
+  const ts = Array.isArray(texts) ? texts : [texts];
+  return client.pushMessage(
+    to,
+    ts.map(text => ({ type: 'text', text })),
+  );
+};
+
+async function getMembersProfile(memberIds, bundleId, type) {
   const res = {};
   // eslint-disable-next-line
   for (const memberId of memberIds) {
     let profile;
-    if (type === 'group') {
-      console.log('memberID', memberId);
-      console.log('bundleId', bundleId);
-      // eslint-disable-next-line
-      profile = await client.getGroupMemberProfile(bundleId, memberId);
-    } if (type === 'room') {
-      console.log('memberID', memberId);
-      console.log('bundleId', bundleId);
-      // eslint-disable-next-line
-      profile = await client.getRoomMemberProfile(bundleId, memberId);
-    }
+    profile = await getMemberProfile(bundleId, memberId, type);
     res[memberId] = profile;
   }
   return res;
 }
 
+async function getMemberProfile(memberId, bundleId, type) {
+  let profile;
+  if (type === 'group') {
+    profile = await client.getGroupMemberProfile(bundleId, memberId);
+  } if (type === 'room') {
+    profile = await client.getRoomMemberProfile(bundleId, memberId);
+  }
+  return profile;
+}
+
+function extractBundleId(source) {
+  return source.groupId || source.roomId;
+}
+function serialize(obj) {
+  return `?${Object.keys(obj).reduce((a, k) => { a.push(`${k}=${encodeURIComponent(obj[k])}`); return a; }, []).join('&')}`;
+}
+
+function buildLiffUrl(bundleId, currentIndex) {
+  const liffUrl = 'line://app/1613121893-RlAO1NqA';
+  const params = {};
+  if (bundleId != null) {
+    params.bundleId = bundleId;
+  }
+  if (currentIndex != null) {
+    params.currentIndex = currentIndex;
+  }
+  return `${liffUrl}${serialize(params)}`;
+}
+
+
 async function handleText(message, replyToken, source) {
   console.log('message', message);
   console.log('source', source);
   const { text } = message;
-  const liffUrl = 'line://app/1613121893-RlAO1NqA';
   if (/^url$/.test(text)) {
-    return replyText(replyToken, liffUrl);
+    return replyText(replyToken, buildLiffUrl());
   }
   if (/^参加$/.test(text)) {
     if (source.type === 'user') {
       return replyText(replyToken, 'グループもしくはルームで遊んでください');
     }
     // 処理
-    const gameId = `${(source.groupId || source.roomId)}-game`;
-    const docRef = db.collection('games').doc(gameId);
-    // const res = await docRef.update({
-    //   users: Firestore.FieldValue.arrayUnion('a'),
-    // });
-    await docRef.update({
-      regions: admin.firestore.FieldValue.arrayUnion('greater_virginia'),
+    const gameId = `${(extractBundleId(source))}-game`;
+    const gameDocRef = db.collection('games').doc(gameId);
+    const sourceUserProfile = await getMemberProfile(source.userId, extractBundleId(source), source.type);
+    const userId2DisplayName = {};
+    userId2DisplayName[source.userId] = sourceUserProfile.displayName;
+    await gameDocRef.update({
+      usersIds: admin.firestore.FieldValue.arrayUnion(source.userId),
+      userId2DisplayName: admin.firestore.FieldValue.arrayUnion(userId2DisplayName),
     });
-    return replyText(replyToken, 'test');
+    const docSnapshot = await gameDocRef.get();
+    let displayNames;
+    if (docSnapshot.exists) {
+      const uids2dn = await docSnapshot.get('userId2DisplayName');
+      if (uids2dn != null) {
+        displayNames = uids2dn.map(el => Object.values(el)[0]);
+      }
+    }
+    return replyText(replyToken, `参加を受け付けました。\n\n現在の参加者一覧\n${displayNames.join('\n')}`);
   }
   if (/^開始$/.test(text)) {
-    let memberIds;
-    let members;
     if (source.type === 'user') {
       return replyText(replyToken, 'グループもしくはルームで遊んでください');
-    } if (source.type === 'group') {
-      // 普通のアカウントでは使えない
-      memberIds = await client.getGroupMemberIds(source.groupId);
-      console.log('memberIds', memberIds);
-      members = await getMemberProfile(memberIds, source.groupId, 'group');
-    } if (source.type === 'room') {
-      console.log('source.roomId', source.roomId);
-      try {
-        // 普通のアカウントでは使えない
-        memberIds = await client.getRoomMemberIds(source.roomId);
-      } catch (err) {
-        console.log('error', err);
-      }
-
-      console.log('memberIds', memberIds);
-      members = await getMemberProfile(memberIds, source.roomId, 'room');
     }
-    console.log('members', members);
-    return replyText();
+    // 順番決め
+    const gameId = `${(extractBundleId(source))}-game`;
+    const gameDocRef = db.collection('games').doc(gameId);
+    const docSnapshot = await gameDocRef.get();
+    let playersNum;
+    let orderedPlayers;
+    let firstPlayerUserId;
+    if (docSnapshot.exists) {
+      const data = await docSnapshot.data();
+      // すでにゲーム中の場合
+      if (data.currentIndex > -1) {
+        return replyText(replyToken, 'ゲーム続行中です。終了する場合は"終了"と送信してください。');
+      }
+      // 人数を取得
+      const uids2dn = data.userId2DisplayName;
+      if (uids2dn == null) {
+        playersNum = 0;
+      } else {
+        playersNum = uids2dn.length;
+      }
+      // 順番を決定（範囲を作成、シャッフル)
+      const orders = _.shuffle(Array.from(Array(playersNum).keys()));
+      console.log('orders', orders);
+      // 保存
+      gameDocRef.update({
+        orders,
+        currentIndex: 0,
+      });
+      // 順番をユーザー名順に
+      orderedPlayers = orders.map(o => Object.values(uids2dn[o])[0]);
+      [firstPlayerUserId] = Object.keys(uids2dn[orders[0]]);
+    }
+    console.log('orderedPlayers', orderedPlayers);
+    // TODO: お題を取得
+    pushMessage(firstPlayerUserId, `お題はこちら: ハチドリ\nクリックしてから60秒以内に絵を書いてください。\n${buildLiffUrl(extractBundleId(source), 0)}`);
+    const messages = [
+      `ゲームを開始します。\n\n順番はこちらです。\n${orderedPlayers.join('\n')}`,
+      `${orderedPlayers[0]}さんにお題を送信しました。\n60秒以内に絵を書いてください`,
+    ];
+    return replyText(replyToken, messages);
   }
   return replyText(replyToken, message.text);
 }
