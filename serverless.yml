@@ -6,6 +6,13 @@ provider:
   runtime: nodejs8.10
   region: ap-northeast-1
   profile: giboshi31
+  iamRoleStatements:
+      - Effect: "Allow"
+        Action:
+          - "s3:*"
+        Resource:
+          - { "Fn::Join" : ["", ["arn:aws:s3:::", { "Ref" : "ServerlessDeploymentBucket" } ]]}
+          - "arn:aws:s3:::drawing-telephone-game-linebot-images/*"
 
 # 利用するプラグインについて
 plugins:
@@ -38,9 +45,11 @@ functions:
           path: /saveimage
           method: post
           cors: true
-# resources:
-#   Resources:
-#     S3BucketImages:
-#       Type: AWS::S3::Bucket
-#       Properties:
-#         BucketName: drawing-telephone-game-linebot-images
+  sendNext:
+    handler: handler.sendNext
+  triggeredBySavedImage:
+    handler: handler.hello
+    events:
+      - s3:
+          bucket: drawing-telephone-game-linebot-images
+          event: s3:ObjectCreated:*

@@ -41,6 +41,7 @@ body
       $('#btn').on('click', function() {
         const params = (new URL(document.location)).searchParams;
         const bundleId = (params != null && params.has("bundleId")) ? params.get("bundleId") : null;
+        const userId = (params != null && params.has("userId")) ? params.get("userId") : null;
         const currentIndex = (params != null && params.has("currentIndex")) ? params.get("currentIndex") : null;
 
         $.ajax({
@@ -50,27 +51,33 @@ body
             'image': signaturePad.toDataURL('image/jpeg'),
             'bundleId': bundleId,
             'currentIndex': currentIndex,
+            'userId': userId,
           },
           success: function (res, status) {
-            liff.getProfile().then(function (profile) {
-              liff.sendMessages([
-                {
-                  type: 'image',
-                  originalContentUrl: 'https://' + document.domain + '/imgs/' + res + '.jpg',
-                  previewImageUrl: 'https://' + document.domain + '/imgs/' + res + '_240.jpg'
-                },
-                {
-                  type: 'text',
-                  text: 'From:' + profile.displayName
-                }
-              ]).then(function () {
-                liff.closeWindow();
+            console.log('res', res);
+            if (userId != null) {
+              liff.getProfile().then(function (profile) {
+                liff.sendMessages([
+                  {
+                    type: 'image',
+                    originalContentUrl: res.filePath,
+                    previewImageUrl: res.filePath
+                  },
+                  {
+                    type: 'text',
+                    text: 'From:' + profile.displayName
+                  }
+                ]).then(function () {
+                  liff.closeWindow();
+                }).catch(function (error) {
+                  window.alert('Error sending message: ' + error.message);
+                });
               }).catch(function (error) {
-                window.alert('Error sending message: ' + error.message);
+                  window.alert("Error getting profile: " + error.message);
               });
-            }).catch(function (error) {
-                window.alert("Error getting profile: " + error.message);
-            });
+            } else {
+              console.log('closing liff window');
+            }
           },
           error: function (res) {
             window.alert('Error saving image: ' + res.status);

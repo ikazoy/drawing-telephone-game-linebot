@@ -58,11 +58,14 @@ function serialize(obj) {
   return `?${Object.keys(obj).reduce((a, k) => { a.push(`${k}=${encodeURIComponent(obj[k])}`); return a; }, []).join('&')}`;
 }
 
-function buildLiffUrl(bundleId, currentIndex) {
+function buildLiffUrl(bundleId, userId, currentIndex) {
   const liffUrl = 'line://app/1613121893-RlAO1NqA';
   const params = {};
   if (bundleId != null) {
     params.bundleId = bundleId;
+  }
+  if (userId != null) {
+    params.userId = userId;
   }
   if (currentIndex != null) {
     params.currentIndex = currentIndex;
@@ -70,6 +73,15 @@ function buildLiffUrl(bundleId, currentIndex) {
   return `${liffUrl}${serialize(params)}`;
 }
 
+function latestGameDocRef(source) {
+  const gameId = `${(extractBundleId(source))}-game`;
+  return db.collection('games').doc(gameId).collection('latest').doc('latest');
+}
+
+function oldGameDocRef(source) {
+  const gameId = `${(extractBundleId(source))}-game`;
+  return db.collection('games').doc(gameId).collection('old');
+}
 
 async function handleText(message, replyToken, source) {
   console.log('message', message);
@@ -83,32 +95,47 @@ async function handleText(message, replyToken, source) {
       return replyText(replyToken, 'グループもしくはルームで遊んでください');
     }
     // 処理
-    const gameId = `${(extractBundleId(source))}-game`;
-    const gameDocRef = db.collection('games').doc(gameId);
+    const gameDocRef = latestGameDocRef(source);
+    const docSnapshot = await gameDocRef.get();
+    if (docSnapshot.exists) {
+      const data = await docSnapshot.data();
+      // すでにゲーム中の場合
+      if (data.currentIndex > -1) {
+        return replyText(replyToken, 'ゲーム続行中です。終了する場合は"終了"と送信してください。');
+      }
+    }
+    // update userlist
     const sourceUserProfile = await getMemberProfile(source.userId, extractBundleId(source), source.type);
     const userId2DisplayName = {};
     userId2DisplayName[source.userId] = sourceUserProfile.displayName;
-    await gameDocRef.update({
+    await gameDocRef.set({
       usersIds: admin.firestore.FieldValue.arrayUnion(source.userId),
       userId2DisplayName: admin.firestore.FieldValue.arrayUnion(userId2DisplayName),
-    });
-    const docSnapshot = await gameDocRef.get();
-    let displayNames;
-    if (docSnapshot.exists) {
-      const uids2dn = await docSnapshot.get('userId2DisplayName');
-      if (uids2dn != null) {
-        displayNames = uids2dn.map(el => Object.values(el)[0]);
-      }
+    }, { merge: true });
+    let displayNames = [];
+    // NOTE: doen't accept method chain
+    // const uids2dn = await gameDocRef.get().get('userId2DisplayName');
+    const docSnapshot2 = await gameDocRef.get();
+    const uids2dn = docSnapshot2.get('userId2DisplayName');
+    if (uids2dn != null) {
+      displayNames = uids2dn.map(el => Object.values(el)[0]);
     }
     return replyText(replyToken, `参加を受け付けました。\n\n現在の参加者一覧\n${displayNames.join('\n')}`);
+  }
+  // TODO: 終了
+  if (/^終了$/.test(text)) {
+    const gameDocRef = latestGameDocRef(source);
+    return replyText(replyToken, 'ゲームを終了しました');
   }
   if (/^開始$/.test(text)) {
     if (source.type === 'user') {
       return replyText(replyToken, 'グループもしくはルームで遊んでください');
     }
+    // TODO: validate
+    // 2人以上でないとエラー
+
     // 順番決め
-    const gameId = `${(extractBundleId(source))}-game`;
-    const gameDocRef = db.collection('games').doc(gameId);
+    const gameDocRef = latestGameDocRef(source);
     const docSnapshot = await gameDocRef.get();
     let playersNum;
     let orderedPlayers;
@@ -140,7 +167,7 @@ async function handleText(message, replyToken, source) {
     }
     console.log('orderedPlayers', orderedPlayers);
     // TODO: お題を取得
-    pushMessage(firstPlayerUserId, `お題はこちら: ハチドリ\nクリックしてから60秒以内に絵を書いてください。\n${buildLiffUrl(extractBundleId(source), 0)}`);
+    pushMessage(firstPlayerUserId, `お題はこちら: ハチドリ\nクリックしてから60秒以内に絵を書いてください。\n${buildLiffUrl(extractBundleId(source), source.userId, 0)}`);
     const messages = [
       `ゲームを開始します。\n\n順番はこちらです。\n${orderedPlayers.join('\n')}`,
       `${orderedPlayers[0]}さんにお題を送信しました。\n60秒以内に絵を書いてください`,
