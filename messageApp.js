@@ -3,57 +3,11 @@ const express = require('express');
 const line = require('@line/bot-sdk');
 const admin = require('firebase-admin');
 const _ = require('underscore');
-const db = require('./libs/firebaseInit');
 
-// eslint-disable-next-line
-const accessToken = 'pa0zKktb+fZeGVzo3oYS7NfCn6H3973uf31ScxpNA9bdSS1/yaia1Fe9NKce+B9PMYs8rCOZaR8PUab6Y7wweF3HWmCkuP/LPCHxD7aUIq5z/+fIIyodhDbMGS/9aIKIr+pTv6UGbseDyti/kATTOwdB04t89/1O/w1cDnyilFU=';
-const secret = '48ffdf7cb5eeb0f5bd8323b94f501780';
-const config = {
-  channelAccessToken: accessToken,
-  channelSecret: secret,
-};
-const client = new line.Client(config);
+const firestore = require('./libs/firestore');
+const lineLib = require('./libs/line');
 
-const replyText = (token, texts) => {
-  const ts = Array.isArray(texts) ? texts : [texts];
-  return client.replyMessage(
-    token,
-    ts.map(text => ({ type: 'text', text })),
-  );
-};
 
-const pushMessage = (to, texts) => {
-  const ts = Array.isArray(texts) ? texts : [texts];
-  return client.pushMessage(
-    to,
-    ts.map(text => ({ type: 'text', text })),
-  );
-};
-
-async function getMembersProfile(memberIds, bundleId, type) {
-  const res = {};
-  // eslint-disable-next-line
-  for (const memberId of memberIds) {
-    let profile;
-    profile = await getMemberProfile(bundleId, memberId, type);
-    res[memberId] = profile;
-  }
-  return res;
-}
-
-async function getMemberProfile(memberId, bundleId, type) {
-  let profile;
-  if (type === 'group') {
-    profile = await client.getGroupMemberProfile(bundleId, memberId);
-  } if (type === 'room') {
-    profile = await client.getRoomMemberProfile(bundleId, memberId);
-  }
-  return profile;
-}
-
-function extractBundleId(source) {
-  return source.groupId || source.roomId;
-}
 function serialize(obj) {
   return `?${Object.keys(obj).reduce((a, k) => { a.push(`${k}=${encodeURIComponent(obj[k])}`); return a; }, []).join('&')}`;
 }
@@ -73,39 +27,29 @@ function buildLiffUrl(bundleId, userId, currentIndex) {
   return `${liffUrl}${serialize(params)}`;
 }
 
-function latestGameDocRef(source) {
-  const gameId = `${(extractBundleId(source))}-game`;
-  return db.collection('games').doc(gameId).collection('latest').doc('latest');
-}
-
-function oldGameDocRef(source) {
-  const gameId = `${(extractBundleId(source))}-game`;
-  return db.collection('games').doc(gameId).collection('old');
-}
-
 async function handleText(message, replyToken, source) {
   console.log('message', message);
   console.log('source', source);
   const { text } = message;
   if (/^url$/.test(text)) {
-    return replyText(replyToken, buildLiffUrl());
+    return lineLib.replyText(replyToken, buildLiffUrl());
   }
   if (/^参加$/.test(text)) {
     if (source.type === 'user') {
-      return replyText(replyToken, 'グループもしくはルームで遊んでください');
+      return lineLib.replyText(replyToken, 'グループもしくはルームで遊んでください');
     }
     // 処理
-    const gameDocRef = latestGameDocRef(source);
+    const gameDocRef = firestore.latestGameDocRefFromSource(source);
     const docSnapshot = await gameDocRef.get();
     if (docSnapshot.exists) {
       const data = await docSnapshot.data();
       // すでにゲーム中の場合
       if (data.currentIndex > -1) {
-        return replyText(replyToken, 'ゲーム続行中です。終了する場合は"終了"と送信してください。');
+        return lineLib.replyText(replyToken, 'ゲーム続行中です。終了する場合は"終了"と送信してください。');
       }
     }
     // update userlist
-    const sourceUserProfile = await getMemberProfile(source.userId, extractBundleId(source), source.type);
+    const sourceUserProfile = await lineLib.getMemberProfile(source.userId, firestore.extractBundleId(source), source.type);
     const userId2DisplayName = {};
     userId2DisplayName[source.userId] = sourceUserProfile.displayName;
     await gameDocRef.set({
@@ -120,22 +64,22 @@ async function handleText(message, replyToken, source) {
     if (uids2dn != null) {
       displayNames = uids2dn.map(el => Object.values(el)[0]);
     }
-    return replyText(replyToken, `参加を受け付けました。\n\n現在の参加者一覧\n${displayNames.join('\n')}`);
+    return lineLib.replyText(replyToken, `参加を受け付けました。\n\n現在の参加者一覧\n${displayNames.join('\n')}`);
   }
   // TODO: 終了
   if (/^終了$/.test(text)) {
-    const gameDocRef = latestGameDocRef(source);
-    return replyText(replyToken, 'ゲームを終了しました');
+    const gameDocRef = firestore.latestGameDocRefFromSource(source);
+    return lineLib.replyText(replyToken, 'ゲームを終了しました');
   }
   if (/^開始$/.test(text)) {
     if (source.type === 'user') {
-      return replyText(replyToken, 'グループもしくはルームで遊んでください');
+      return lineLib.replyText(replyToken, 'グループもしくはルームで遊んでください');
     }
     // TODO: validate
     // 2人以上でないとエラー
 
     // 順番決め
-    const gameDocRef = latestGameDocRef(source);
+    const gameDocRef = firestore.latestGameDocRefFromSource(source);
     const docSnapshot = await gameDocRef.get();
     let playersNum;
     let orderedPlayers;
@@ -144,7 +88,7 @@ async function handleText(message, replyToken, source) {
       const data = await docSnapshot.data();
       // すでにゲーム中の場合
       if (data.currentIndex > -1) {
-        return replyText(replyToken, 'ゲーム続行中です。終了する場合は"終了"と送信してください。');
+        return lineLib.replyText(replyToken, 'ゲーム続行中です。終了する場合は"終了"と送信してください。');
       }
       // 人数を取得
       const uids2dn = data.userId2DisplayName;
@@ -167,14 +111,14 @@ async function handleText(message, replyToken, source) {
     }
     console.log('orderedPlayers', orderedPlayers);
     // TODO: お題を取得
-    pushMessage(firstPlayerUserId, `お題はこちら: ハチドリ\nクリックしてから60秒以内に絵を書いてください。\n${buildLiffUrl(extractBundleId(source), source.userId, 0)}`);
+    lineLib.pushMessage(firstPlayerUserId, `お題はこちら: ハチドリ\nクリックしてから60秒以内に絵を書いてください。\n${buildLiffUrl(firestore.extractBundleId(source), source.userId, 0)}`);
     const messages = [
       `ゲームを開始します。\n\n順番はこちらです。\n${orderedPlayers.join('\n')}`,
       `${orderedPlayers[0]}さんにお題を送信しました。\n60秒以内に絵を書いてください`,
     ];
-    return replyText(replyToken, messages);
+    return lineLib.replyText(replyToken, messages);
   }
-  return replyText(replyToken, message.text);
+  return lineLib.replyText(replyToken, message.text);
 }
 
 function handleEvent(event) {
@@ -243,7 +187,7 @@ const app = express();
 // }));
 // app.use(express.static(path.join(__dirname, 'public')));
 
-app.post('/webhook', line.middleware(config), async (req, res) => {
+app.post('/webhook', line.middleware(lineLib.config), async (req, res) => {
   try {
     const result = await req.body.events.map(handleEvent);
     res.json(result);

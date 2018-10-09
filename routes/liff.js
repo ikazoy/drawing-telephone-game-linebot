@@ -44,7 +44,7 @@ router.post('/saveimage', async (req, res, text) => {
     ContentType: imageBuffer.type,
     Body: imageBuffer.data,
     // TODO: fix me
-    ACL: 'public-read-write',
+    ACL: 'public-read',
   };
   await s3.putObject(params, (err, data) => {
     let response;

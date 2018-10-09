@@ -1,16 +1,68 @@
 // yarn run sls invoke local --function triggeredBySavedImage -p s3Object-event.json
-module.exports.hello = (event, context, callback) => {
-  console.log(JSON.stringify(event, undefined, 1));
+const aws = require('aws-sdk');
+const firestore = require('./libs/firestore');
+
+module.exports.triggeredBySavedImage = (event, context, callback) => {
   const changedObject = event.Records[0].s3.object;
   const objectKey = changedObject.key;
   const regex = /(\w+)\/([0-9]+)-(\w+)\.(jpeg)/;
   const regexResult = objectKey.match(regex);
   const [str, bundleId, indexOfImage, userId, prefix] = regexResult;
-  console.log(regexResult);
   // R0424f09e0bd8f1fc7c7e99d260933373/0-Uceb4ceddcf7c2f2a508aa245469320e9.jepg
   console.log('objectKey', objectKey);
+  const lambda = new aws.Lambda();
+  const payload = {
+    bundleId,
+    indexOfImage: Number(indexOfImage) + 1,
+  };
+  const opts = {
+    FunctionName: 'liff-test-dev-sendNext',
+    Payload: JSON.stringify(payload),
+  };
+  lambda.invoke(opts, (err, data) => {
+    if (err) {
+      console.log(`error : ${err}`);
+      callback(err, null);
+    } else if (data) {
+      const response = {
+        statusCode: 200,
+        // body: JSON.parse(data.Payload)
+        body: '{"msg": "success"}',
+      };
+      callback(null, response);
+    }
+  });
+};
+
+
+// yarn run sls invoke local --function sendNext -p sendNext-event.json
+module.exports.sendNext = async (event, context, callback) => {
+  console.log('sendNext');
+  console.log(event);
+  const { bundleId } = event;
+  const nextIndex = event.indexOfImage;
+  // 1. 次の順番のユーザーにメッセージを送る
+  // 1-1. firestoreから次のユーザーを取得
+  const gameDocRef = firestore.latestGameDocRef(`${bundleId}-game`);
+  const docSnapshot = await gameDocRef.get();
+  if (docSnapshot.exists) {
+    const data = await docSnapshot.data();
+    const nextUserIndex = data.orders[nextIndex];
+    const nextUserId = data.usersIds[nextUserIndex];
+    const nextUserDisplayName = Object.values(data.userId2DisplayName[nextUserIndex])[0];
+    console.log('nextUserId', nextUserId);
+    console.log('nextUserDisplayName', nextUserDisplayName);
+  }
+  // 2. 全体にメッセージを送る
+  // TODO: implement 2
+
+  // 3. firestoreの情報をupdate
+  await gameDocRef.update({
+    currentIndex: nextIndex,
+  });
   const response = {
     statusCode: 200,
+    // body: JSON.parse(data.Payload)
     body: '{"msg": "success"}',
   };
   callback(null, response);

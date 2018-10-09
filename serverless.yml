@@ -48,7 +48,7 @@ functions:
   sendNext:
     handler: handler.sendNext
   triggeredBySavedImage:
-    handler: handler.hello
+    handler: handler.triggeredBySavedImage
     events:
       - s3:
           bucket: drawing-telephone-game-linebot-images
