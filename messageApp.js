@@ -5,6 +5,7 @@ const admin = require('firebase-admin');
 const _ = require('underscore');
 const s3Lib = require('./libs/s3');
 const util = require('./libs/util');
+const themes = require('./libs/themes');
 
 const firestore = require('./libs/firestore');
 const lineLib = require('./libs/line');
@@ -18,7 +19,7 @@ async function isGuessingAnswerer(bundleId, userId) {
   const docSnapshot = await gameDocRef.get();
   if (docSnapshot.exists) {
     const data = await docSnapshot.data();
-    return (data.usersIds[data.currentIndex] === userId && data.currentIndex != null && data.currentIndex % 2 === 1);
+    return (data.usersIds[data.orders[data.currentIndex]] === userId && data.currentIndex != null && data.currentIndex % 2 === 1);
   }
   return false;
 }
@@ -87,12 +88,13 @@ async function handleText(message, replyToken, source) {
       );
       lineLib.replyText(replyToken, [
         `それでは結果発表です\n\nお題は「${theme}」でした！`,
-        `${firstPlayerDisplayName}が描いた絵はこちら`,
+        `${firstPlayerDisplayName}さんが描いた絵はこちら`,
         {
           type: 'image',
           originalContentUrl: imageUrl,
           previewImageUrl: imageUrl,
         },
+        '「次へ」と送信すると、次の人の絵もしくは回答を見ることができます。',
       ]);
       gameDocRef.update({ currentAnnounceIndex: 1 });
     } else if (currentAnnounceIndex > 0) {
@@ -100,22 +102,25 @@ async function handleText(message, replyToken, source) {
       const targetPlayerUserId = data.usersIds[data.orders[currentAnnounceIndex]];
       const targetPlayerDisplayName = data.userId2DisplayName[data.orders[currentAnnounceIndex]][targetPlayerUserId];
       const messages = [];
+      let additionalMessage;
       if (util.questionType(currentAnnounceIndex) === 'drawing') {
         const imageUrl = s3Lib.buildObjectUrl(
           firestore.extractBundleId(source),
           currentAnnounceIndex,
           targetPlayerUserId,
         );
-        messages.push(`${targetPlayerDisplayName}が描いた絵はこちら`);
+        messages.push(`${targetPlayerDisplayName}さんが描いた絵はこちら`);
         messages.push({
           type: 'image',
           originalContentUrl: imageUrl,
           previewImageUrl: imageUrl,
         });
+        additionalMessage = '最後の絵はどうでしたか？みんなで点数をつけてみると面白いかもしれませんよ。';
       } else if (util.questionType(currentAnnounceIndex) === 'guessing') {
         const s3Object = await s3Lib.getObject(firestore.extractBundleId(source), currentAnnounceIndex, targetPlayerUserId);
         const answeredTheme = s3Object.Body.toString();
-        messages.push(`${targetPlayerDisplayName}はこの絵を${answeredTheme}だと思いました`);
+        messages.push(`${targetPlayerDisplayName}さんはこの絵を「${answeredTheme}」だと答えました。`);
+        additionalMessage = '最初のお題は最後の人まで正しく伝わったでしょうか？';
       }
       gameDocRef.update({ currentAnnounceIndex: currentAnnounceIndex + 1 });
       if (data.usersIds.length <= currentAnnounceIndex + 1) {
@@ -124,7 +129,7 @@ async function handleText(message, replyToken, source) {
         oldGameCollectionRef.add(data);
         gameDocRef.delete();
         // ありがとうメッセージ
-        messages.push('結果発表は以上で終了です。\n\n新しいお題で遊ぶには、各参加者が「参加」と送信した後に、「開始」と送信してください。');
+        messages.push(`以上で結果発表は終了です。\n${additionalMessage}\n\n新しいお題で遊ぶには、各参加者が「参加」と送信した後に、「開始」と送信してください。`);
       }
       return lineLib.replyText(replyToken, messages);
     }
@@ -159,11 +164,9 @@ async function handleText(message, replyToken, source) {
     } else {
       playersNum = uids2dn.length;
     }
-    // 順番を決定（範囲を作成、シャッフル)
+    // 順番、お題を決定（範囲を作成、シャッフル)
     const orders = _.shuffle(Array.from(Array(playersNum).keys()));
-    console.log('orders', orders);
-    // TODO: お題を取得
-    const theme = 'ハチドリ';
+    const theme = themes[_.random(0, themes.length - 1)];
     // 保存
     gameDocRef.update({
       orders,
@@ -220,7 +223,7 @@ async function handleText(message, replyToken, source) {
     );
     return lineLib.replyText(replyToken, '回答ありがとうございました');
   }
-  return lineLib.replyText(replyToken, message.text);
+  return 1;
 }
 
 

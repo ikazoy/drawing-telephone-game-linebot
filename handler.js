@@ -29,7 +29,6 @@ module.exports.triggeredBySavedImage = (event, context, callback) => {
     } else if (data) {
       const response = {
         statusCode: 200,
-        // body: JSON.parse(data.Payload)
         body: '{"msg": "success"}',
       };
       callback(null, response);
@@ -48,16 +47,16 @@ module.exports.sendNext = async (event, context, callback) => {
     const currentUserIndex = data.orders[nextIndex - 1];
     const currentUserId = data.usersIds[currentUserIndex];
     const currentUserDisplayName = Object.values(data.userId2DisplayName[currentUserIndex])[0];
+    // 人数分終了
     if (data.currentIndex + 1 >= data.usersIds.length) {
-      // TODO: 終わりの処理
       const doneDocRef = firestore.doneGameDocRef(`${bundleId}-game`);
       // copy and delete old ones
       doneDocRef.set(data);
       gameDocRef.delete();
       if (util.questionType(nextIndex) === 'drawing') {
-        publicMessage = `${currentUserDisplayName}さんが回答しました。結果発表を見る場合は「結果発表」と送信してください。`;
+        publicMessage = `${currentUserDisplayName}さんが回答しました。以上でゲームは終了です。結果発表を見る場合は「結果発表」と送信してください。`;
       } else if (util.questionType(nextIndex) === 'guessing') {
-        publicMessage = `${currentUserDisplayName}さんが絵を描き終わりました。結果発表を見る場合は「結果発表」と送信してください。`;
+        publicMessage = `${currentUserDisplayName}さんが絵を描き終わりました。以上でゲームは終了です。結果発表を見る場合は「結果発表」と送信してください。`;
       }
     } else {
       // 1. 次の順番のユーザーにメッセージを送る
@@ -70,17 +69,17 @@ module.exports.sendNext = async (event, context, callback) => {
         lineLib.pushMessage(nextUserId, `${currentUserDisplayName}さんから回ってきたお題は「${theme}」です。\n以下のURLをクリックして60秒以内に絵を描いてください。\n${lineLib.buildLiffUrl(bundleId, nextUserId, nextIndex)}`);
         publicMessage = `${currentUserDisplayName}さんが回答しました。${nextUserDisplayName}さんはお題に沿って絵を描いてください。`;
       } else if (util.questionType(nextIndex) === 'guessing') {
-        const imageUrl = s3Lib.buildObjectUrl(bundleId);
+        const imageUrl = s3Lib.buildObjectUrl(bundleId, nextIndex - 1, currentUserId);
         console.log('imageUrl', imageUrl);
-        lineLib.pushMessage(nextUserId, `${currentUserDisplayName}さんが描いた絵はこちらです。何の絵に見えますか？`);
-        // TODO: pushMessageを画像メッセージに対応
-        lineLib.client.pushMessage(nextUserId, [
+        const messages = [
+          `${currentUserDisplayName}さんが描いた絵はこちらです。何の絵に見えますか？`,
           {
             type: 'image',
             originalContentUrl: imageUrl,
             previewImageUrl: imageUrl,
           },
-        ]);
+        ];
+        lineLib.pushMessage(nextUserId, messages);
         publicMessage = `${currentUserDisplayName}さんが絵を描き終わりました。${nextUserDisplayName}さんは絵を見て予想してください`;
       }
       // 2. firestoreの情報をupdate
