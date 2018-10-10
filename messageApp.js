@@ -4,17 +4,21 @@ const line = require('@line/bot-sdk');
 const admin = require('firebase-admin');
 const _ = require('underscore');
 const s3Lib = require('./libs/s3');
+const util = require('./libs/util');
 
 const firestore = require('./libs/firestore');
 const lineLib = require('./libs/line');
 
 
 async function isGuessingAnswerer(bundleId, userId) {
+  if (bundleId == null || userId == null) {
+    return false;
+  }
   const gameDocRef = firestore.latestGameDocRef(`${bundleId}-game`);
   const docSnapshot = await gameDocRef.get();
   if (docSnapshot.exists) {
     const data = await docSnapshot.data();
-    return (data.userIds[data.currentIndex] === userId);
+    return (data.usersIds[data.currentIndex] === userId && data.currentIndex != null && data.currentIndex % 2 === 1);
   }
   return false;
 }
@@ -61,7 +65,71 @@ async function handleText(message, replyToken, source) {
       bundleId: firestore.extractBundleId(source),
     });
     return lineLib.replyText(replyToken, `参加を受け付けました。\n\n現在の参加者一覧\n${displayNames.join('\n')}`);
-  } if (/^終了$/.test(text)) {
+  }
+  if (/^結果発表$/.test(text) || /^次へ$/.test(text)) {
+    const gameDocRef = firestore.doneGameDocRefFromSource(source);
+    const docSnapshot = await gameDocRef.get();
+    const data = await docSnapshot.data();
+    const { currentAnnounceIndex, theme } = data;
+    if (!theme || !docSnapshot.exists) {
+      return lineLib.replyText(replyToken, '結果発表できるゲームが見つかりませんでした。再度最初からおためしください。');
+    }
+    // 結果発表開始
+    if (currentAnnounceIndex === undefined) {
+      const currentIndex = 0;
+      const firstPlayerUserId = data.usersIds[data.orders[currentIndex]];
+      const firstPlayerDisplayName = data.userId2DisplayName[data.orders[currentIndex]][firstPlayerUserId];
+      // 「次へ」を待たずにいきなりindex = 0の絵を送る
+      const imageUrl = s3Lib.buildObjectUrl(
+        firestore.extractBundleId(source),
+        currentIndex,
+        firstPlayerUserId,
+      );
+      lineLib.replyText(replyToken, [
+        `それでは結果発表です\n\nお題は「${theme}」でした！`,
+        `${firstPlayerDisplayName}が描いた絵はこちら`,
+        {
+          type: 'image',
+          originalContentUrl: imageUrl,
+          previewImageUrl: imageUrl,
+        },
+      ]);
+      gameDocRef.update({ currentAnnounceIndex: 1 });
+    } else if (currentAnnounceIndex > 0) {
+      // 結果発表中
+      const targetPlayerUserId = data.usersIds[data.orders[currentAnnounceIndex]];
+      const targetPlayerDisplayName = data.userId2DisplayName[data.orders[currentAnnounceIndex]][targetPlayerUserId];
+      const messages = [];
+      if (util.questionType(currentAnnounceIndex) === 'drawing') {
+        const imageUrl = s3Lib.buildObjectUrl(
+          firestore.extractBundleId(source),
+          currentAnnounceIndex,
+          targetPlayerUserId,
+        );
+        messages.push(`${targetPlayerDisplayName}が描いた絵はこちら`);
+        messages.push({
+          type: 'image',
+          originalContentUrl: imageUrl,
+          previewImageUrl: imageUrl,
+        });
+      } else if (util.questionType(currentAnnounceIndex) === 'guessing') {
+        const s3Object = await s3Lib.getObject(firestore.extractBundleId(source), currentAnnounceIndex, targetPlayerUserId);
+        const answeredTheme = s3Object.Body.toString();
+        messages.push(`${targetPlayerDisplayName}はこの絵を${answeredTheme}だと思いました`);
+      }
+      gameDocRef.update({ currentAnnounceIndex: currentAnnounceIndex + 1 });
+      if (data.usersIds.length <= currentAnnounceIndex + 1) {
+        // 結果発表終了のためfirestore上のデータを移動
+        const oldGameCollectionRef = firestore.oldGameCollectionRef(`${(firestore.extractBundleId(source))}-game`);
+        oldGameCollectionRef.add(data);
+        gameDocRef.delete();
+        // ありがとうメッセージ
+        messages.push('結果発表は以上で終了です。\n\n新しいお題で遊ぶには、各参加者が「参加」と送信した後に、「開始」と送信してください。');
+      }
+      return lineLib.replyText(replyToken, messages);
+    }
+  }
+  if (/^終了$/.test(text)) {
     // TODO: 終了
     const gameDocRef = firestore.latestGameDocRefFromSource(source);
     return lineLib.replyText(replyToken, 'ゲームを終了しました');
@@ -72,40 +140,41 @@ async function handleText(message, replyToken, source) {
     // TODO: validate
     // 2人以上でないとエラー
 
-    // 順番決め
+    // 順番、テーマ決め
     const gameDocRef = firestore.latestGameDocRefFromSource(source);
     const docSnapshot = await gameDocRef.get();
     let playersNum;
-    let orderedPlayers;
-    let firstPlayerUserId;
-    if (docSnapshot.exists) {
-      const data = await docSnapshot.data();
-      // すでにゲーム中の場合
-      if (data.currentIndex > -1) {
-        return lineLib.replyText(replyToken, 'ゲーム続行中です。終了する場合は"終了"と送信してください。');
-      }
-      // 人数を取得
-      const uids2dn = data.userId2DisplayName;
-      if (uids2dn == null) {
-        playersNum = 0;
-      } else {
-        playersNum = uids2dn.length;
-      }
-      // 順番を決定（範囲を作成、シャッフル)
-      const orders = _.shuffle(Array.from(Array(playersNum).keys()));
-      console.log('orders', orders);
-      // 保存
-      gameDocRef.update({
-        orders,
-        currentIndex: 0,
-      });
-      // 順番をユーザー名順に
-      orderedPlayers = orders.map(o => Object.values(uids2dn[o])[0]);
-      [firstPlayerUserId] = Object.keys(uids2dn[orders[0]]);
+    if (!docSnapshot.exists) {
+      return lineLib.replyText(replyToken, 'エラーが発生しました。');
     }
-    console.log('orderedPlayers', orderedPlayers);
+    const data = await docSnapshot.data();
+    // すでにゲーム中の場合
+    if (data.currentIndex > -1) {
+      return lineLib.replyText(replyToken, 'ゲーム続行中です。終了する場合は"終了"と送信してください。');
+    }
+    // 人数を取得
+    const uids2dn = data.userId2DisplayName;
+    if (uids2dn == null) {
+      playersNum = 0;
+    } else {
+      playersNum = uids2dn.length;
+    }
+    // 順番を決定（範囲を作成、シャッフル)
+    const orders = _.shuffle(Array.from(Array(playersNum).keys()));
+    console.log('orders', orders);
     // TODO: お題を取得
-    lineLib.pushMessage(firstPlayerUserId, `お題はこちら: ハチドリ\nクリックしてから60秒以内に絵を書いてください。\n${lineLib.buildLiffUrl(firestore.extractBundleId(source), firstPlayerUserId, 0)}`);
+    const theme = 'ハチドリ';
+    // 保存
+    gameDocRef.update({
+      orders,
+      currentIndex: 0,
+      theme,
+    });
+    // 順番をユーザー名順に
+    const orderedPlayers = orders.map(o => Object.values(uids2dn[o])[0]);
+    const [firstPlayerUserId] = Object.keys(uids2dn[orders[0]]);
+    console.log('orderedPlayers', orderedPlayers);
+    lineLib.pushMessage(firstPlayerUserId, `お題: 「${theme}」\nクリックしてから60秒以内に絵を書いてください。\n${lineLib.buildLiffUrl(firestore.extractBundleId(source), firstPlayerUserId, 0)}`);
     const messages = [
       `ゲームを開始します。\n\n順番はこちらです。\n${orderedPlayers.join('\n')}`,
       `${orderedPlayers[0]}さんにお題を送信しました。\n60秒以内に絵を書いてください`,
@@ -113,43 +182,44 @@ async function handleText(message, replyToken, source) {
     return lineLib.replyText(replyToken, messages);
   }
   // 回答の場合
-  if (source.type === 'user' && isGuessingAnswerer(firestore.latestBundleIdOfUser(source.userId), source.userId)) {
+  if (source.type === 'user') {
+    const bundleId = await firestore.latestBundleIdOfUser(source.userId);
+    const resGuessingAnswerer = await isGuessingAnswerer(bundleId, source.userId);
+    if (!resGuessingAnswerer) {
+      return lineLib.replyText(replyToken, '回答者になってからもう一度お答えください。');
+    }
     // s3にtextfileを保存
     console.log('now the user is guessing answerer');
-    console.log('source', source);
-    const directory = firestore.extractBundleId(source);
-    console.log('source2', source);
-    console.log(firestore.extractBundleId(source));
-    const currentIndex = await firestore.currentIndex(firestore.extractBundleId(source));
-    const fileName = (`${currentIndex}-${source.userId}`);
+    const currentIndex = await firestore.currentIndex(bundleId);
     // TODO: bucket nameをserverless.ymlと共通化する
     // https://serverless.com/framework/docs/providers/aws/guide/variables#reference-variables-in-javascript-files
     // TODO: bucketのアクセス権限を治す
-    // const bucketName = 'drawing-telephone-game-linebot-images-test';
-    const fileKey = `${directory}/${fileName}.txt`;
     const params = {
-      Bucket: s3Lib.bucketName,
-      Key: fileKey,
       Body: text,
       ACL: 'public-read',
     };
-    await s3Lib.s3.putObject(params, (err, data) => {
-      if (err) {
-        console.log('err on liff.js putObject', err);
-        // response = res.json({
-        //   success: false,
-        // });
-      } else {
-        console.log('data on liff.js putObject', data);
-        // response = res.json({
-        //   success: true,
-        //   filePath: `${s3Lib.s3BaseUrl}/${s3Lib.bucketName}/${fileKey}`,
-        // });
-      }
-    });
+    await s3Lib.s3.putObject(
+      Object.assign(
+        params,
+        s3Lib.bucketKeyParam(bundleId, currentIndex, source.userId),
+      ),
+      (err, data) => {
+        if (err) {
+          console.log('err on liff.js putObject', err);
+          // response = res.json({
+          //   success: false,
+          // });
+        } else {
+          console.log('data on liff.js putObject', data);
+          // response = res.json({
+          //   success: true,
+          //   filePath: `${s3Lib.s3BaseUrl}/${s3Lib.bucketName}/${fileKey}`,
+          // });
+        }
+      },
+    );
     return lineLib.replyText(replyToken, '回答ありがとうございました');
   }
-
   return lineLib.replyText(replyToken, message.text);
 }
 

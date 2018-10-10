@@ -2,16 +2,17 @@ const db = require('./firebaseInit');
 
 const extractBundleId = source => source.groupId || source.roomId;
 const latestGameDocRef = gameId => db.collection('games').doc(gameId).collection('latest').doc('latest');
-const oldGameDocRef = gameId => db.collection('games').doc(gameId).collection('latest').doc('old');
+const doneGameDocRef = gameId => db.collection('games').doc(gameId).collection('latest').doc('done');
+const oldGameCollectionRef = gameId => db.collection('games').doc(gameId).collection('old');
 
 const latestGameDocRefFromSource = (source) => {
   const gameId = `${(extractBundleId(source))}-game`;
   return latestGameDocRef(gameId);
 };
 
-const oldGameDocRefFromSource = (source) => {
+const doneGameDocRefFromSource = (source) => {
   const gameId = `${(extractBundleId(source))}-game`;
-  return oldGameDocRef(gameId);
+  return doneGameDocRef(gameId);
 };
 
 const usersDocRef = userId => db.collection('users').doc(userId);
@@ -34,9 +35,11 @@ const currentIndex = async (bundleId) => {
 module.exports = {
   extractBundleId,
   latestGameDocRef,
-  oldGameDocRef,
+  doneGameDocRef,
   latestGameDocRefFromSource,
-  oldGameDocRefFromSource,
+  doneGameDocRefFromSource,
   currentIndex,
   usersDocRef,
+  latestBundleIdOfUser,
+  oldGameCollectionRef,
 };

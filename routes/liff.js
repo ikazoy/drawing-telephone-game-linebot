@@ -26,42 +26,34 @@ router.get('/liff', (req, res, next) => {
   res.render('index', { title: 'Express' });
 });
 
-
-
 router.post('/saveimage', async (req, res, text) => {
   const { image } = req.body;
-  const directory = req.body.bundleId || 'noBundleId';
-  const fileName = (req.body.currentIndex) ? (`${req.body.currentIndex}-${req.body.userId}`) : 'noIndex';
   const imageBuffer = decodeBase64Image(image);
   console.log('imageBuffer', imageBuffer);
-  // TODO: bucket nameをserverless.ymlと共通化する
-  // https://serverless.com/framework/docs/providers/aws/guide/variables#reference-variables-in-javascript-files
-  // TODO: bucketのアクセス権限を治す
-  // const bucketName = 'drawing-telephone-game-linebot-images-test';
-  const fileKey = `${directory}/${fileName}.jpeg`;
   const params = {
-    Bucket: s3Lib.bucketName,
-    Key: fileKey,
     ContentType: imageBuffer.type,
     Body: imageBuffer.data,
     ACL: 'public-read',
   };
-  await s3.putObject(params, (err, data) => {
-    let response;
-    if (err) {
-      console.log('err on liff.js putObject', err);
-      response = res.json({
-        success: false,
-      });
-    } else {
-      console.log('data on liff.js putObject', data);
-      response = res.json({
-        success: true,
-        filePath: `${s3Lib.s3BaseUrl}/${s3Lib.bucketName}/${fileKey}`,
-      });
-    }
-    return response;
-  });
+  await s3.putObject(
+    Object.assign(params, s3Lib.bucketKeyParam(req.body.bundleId, req.body.currentIndex, req.body.userId)),
+    (err, data) => {
+      let response;
+      if (err) {
+        console.log('err on liff.js putObject', err);
+        response = res.json({
+          success: false,
+        });
+      } else {
+        console.log('data on liff.js putObject', data);
+        response = res.json({
+          success: true,
+          filePath: s3Lib.buildObjectUrl(req.body.bundleId, req.body.currentIndex, req.body.userId),
+        });
+      }
+      return response;
+    },
+  );
 });
 
 module.exports = router;

@@ -13,19 +13,38 @@ function serialize(obj) {
   return `?${Object.keys(obj).reduce((a, k) => { a.push(`${k}=${encodeURIComponent(obj[k])}`); return a; }, []).join('&')}`;
 }
 
-const replyText = (token, texts) => {
-  const ts = Array.isArray(texts) ? texts : [texts];
+const construcMessage = (message) => {
+  let constructedMessage;
+  if (typeof message === 'object') {
+    if (message.type === 'image') {
+      constructedMessage = {
+        type: message.type,
+        originalContentUrl: message.originalContentUrl,
+        previewImageUrl: message.previewImageUrl,
+      };
+    }
+  } else if (typeof message === 'string' || typeof message === 'number') {
+    constructedMessage = {
+      type: 'text',
+      text: message,
+    };
+  }
+  return constructedMessage;
+};
+
+const replyText = (token, messages) => {
+  const ms = Array.isArray(messages) ? messages : [messages];
   return client.replyMessage(
     token,
-    ts.map(text => ({ type: 'text', text })),
+    ms.map(element => construcMessage(element)),
   );
 };
 
-const pushMessage = (to, texts) => {
-  const ts = Array.isArray(texts) ? texts : [texts];
+const pushMessage = (to, messages) => {
+  const ms = Array.isArray(messages) ? messages : [messages];
   return client.pushMessage(
     to,
-    ts.map(text => ({ type: 'text', text })),
+    ms.map(element => construcMessage(element)),
   );
 };
 
