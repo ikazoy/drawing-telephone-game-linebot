@@ -13,12 +13,19 @@ html(lang="ja")
       table {
         width: 100%
       }
+      .divider{
+        width: 15px;
+        height: auto;
+        display: inline-block;
+      }
+
 body
   //- TODO: timer
   .container
     canvas#canvas
-    button#btn.btn.btn-primary.btn-block(type="button") Submit
-    button#undo.btn.btn-primary.btn-block(type="button") Undo
+    button#btn.btn.btn-primary.btn-block(type="button") 送信
+    .divider
+    button#undo.btn.btn-primary.btn-block(type="button") 一つ戻る
     script.
       const canvas = document.querySelector('#canvas');
       const signaturePad = new SignaturePad(canvas, {
@@ -27,7 +34,7 @@ body
 
       $(window).on('load', function(){
         canvas.setAttribute('width', $('.container').width());
-        canvas.setAttribute('height', window.innerHeight - $('#btn').outerHeight() - 10);
+        canvas.setAttribute('height', window.innerHeight - $('#btn').outerHeight() - 25);
         signaturePad.clear();
         liff.init(function (data) {});
         document.getElementById('undo').addEventListener('click', function () {
