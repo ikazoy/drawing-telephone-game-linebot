@@ -1,8 +1,8 @@
 const line = require('@line/bot-sdk');
 // TODO: hide this
 // eslint-disable-next-line
-const accessToken = 'pa0zKktb+fZeGVzo3oYS7NfCn6H3973uf31ScxpNA9bdSS1/yaia1Fe9NKce+B9PMYs8rCOZaR8PUab6Y7wweF3HWmCkuP/LPCHxD7aUIq5z/+fIIyodhDbMGS/9aIKIr+pTv6UGbseDyti/kATTOwdB04t89/1O/w1cDnyilFU=';
-const secret = '48ffdf7cb5eeb0f5bd8323b94f501780';
+const accessToken = process.env.LINE_ACCESS_TOKEN;
+const secret = process.env.LINE_SECRET;
 const config = {
   channelAccessToken: accessToken,
   channelSecret: secret,

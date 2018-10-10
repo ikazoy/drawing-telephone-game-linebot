@@ -1,10 +1,11 @@
-// yarn run sls invoke local --function triggeredBySavedImage -p s3Object-event.json
+require('dotenv').config();
 const aws = require('aws-sdk');
 const firestore = require('./libs/firestore');
 const lineLib = require('./libs/line');
 const s3Lib = require('./libs/s3');
 const util = require('./libs/util');
 
+// yarn run sls invoke local --function triggeredBySavedImage -p s3Object-event.json
 module.exports.triggeredBySavedImage = (event, context, callback) => {
   const changedObject = event.Records[0].s3.object;
   const objectKey = changedObject.key;
