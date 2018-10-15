@@ -135,9 +135,9 @@ async function handleText(message, replyToken, source) {
     }
   }
   if (/^終了$/.test(text)) {
-    // TODO: 終了
     const gameDocRef = firestore.latestGameDocRefFromSource(source);
-    return lineLib.replyText(replyToken, 'ゲームを終了しました');
+    gameDocRef.delete();
+    return lineLib.replyText(replyToken, 'ゲームを終了しました。再度ゲームを始める場合は、各参加者が「参加」と送信した後に、「開始」と送信してください。');
   } if (/^開始$/.test(text)) {
     if (source.type === 'user') {
       return lineLib.replyText(replyToken, 'グループもしくはルームで遊んでください');
