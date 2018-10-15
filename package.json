@@ -3,8 +3,9 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "start": "node ./bin/www",
-    "postinstall": "npm rebuild grpc --target=8.1.0 --target_arch=x64 --target_platform=linux --target_libc=glibc"
+    "dev": "sh ./bin/host-dev-env.sh",
+    "deploy": "cp .env.dev .env && sls deploy -v",
+    "deploy-prod": "cp .env.production .env && sls deploy -v -s production"
   },
   "dependencies": {
     "@google-cloud/firestore": "^0.17.0",
