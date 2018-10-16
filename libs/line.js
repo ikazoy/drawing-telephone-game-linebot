@@ -58,7 +58,7 @@ const getMemberProfile = async (memberId, bundleId, type) => {
   return profile;
 };
 const buildLiffUrl = (bundleId, userId, currentIndex) => {
-  const liffUrl = 'line://app/1613121893-RlAO1NqA';
+  const liffUrl = process.env.LIFF_URL;
   const params = {};
   if (bundleId != null) {
     params.bundleId = bundleId;

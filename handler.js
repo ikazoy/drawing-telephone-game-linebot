@@ -20,7 +20,7 @@ module.exports.triggeredBySavedImage = (event, context, callback) => {
     nextIndex: Number(indexOfImage) + 1,
   };
   const opts = {
-    FunctionName: 'liff-test-dev-sendNext',
+    FunctionName: `liff-test-${process.env.NODE_ENV}-sendNext`,
     Payload: JSON.stringify(payload),
   };
   lambda.invoke(opts, (err, data) => {
@@ -126,11 +126,11 @@ module.exports.sendNext = async (event, context, callback) => {
 //                 "s3SchemaVersion": "1.0",
 //                 "configurationId": "a18dfb55-20fd-4be2-8452-ee868be513a2",
 //                 "bucket": {
-//                     "name": "drawing-telephone-game-linebot-images",
+//                     "name": "drawing-telephone-game-linebot-images-development",
 //                     "ownerIdentity": {
 //                         "principalId": "A2K64DQMCGBP71"
 //                     },
-//                     "arn": "arn:aws:s3:::drawing-telephone-game-linebot-images"
+//                     "arn": "arn:aws:s3:::drawing-telephone-game-linebot-images-development"
 //                 },
 //                 "object": {
 //                     "key": "R0424f09e0bd8f1fc7c7e99d260933373/0-Uceb4ceddcf7c2f2a508aa245469320e9.jepg",

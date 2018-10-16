@@ -1,7 +1,7 @@
 # How to develop
 ```
-$ cp .env.sample .env.dev
-$ vim .env.dev
+$ cp .env.sample .env.development
+$ vim .env.development
 $ yarn run dev
 ```
 

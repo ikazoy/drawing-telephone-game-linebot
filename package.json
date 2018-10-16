@@ -4,8 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "sh ./bin/host-dev-env.sh",
-    "deploy": "cp .env.dev .env && sls deploy -v",
-    "deploy-prod": "cp .env.production .env && sls deploy -v -s production"
+    "deploy": "cp .env.development .env && sls deploy --stage development -v",
+    "deploy-prod": "cp .env.production .env && sls deploy --stage production -v"
   },
   "dependencies": {
     "@google-cloud/firestore": "^0.17.0",
