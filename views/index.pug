@@ -13,39 +13,39 @@ html(lang="ja")
       table {
         width: 100%
       }
-      .divider{
+      .divider {
         width: 15px;
         height: auto;
         display: inline-block;
       }
+      .countdown-timer {
+        float: right;
+      }
+      @keyframes blink {
+        75% { opacity: 0.0; }
+      }
+      @-webkit-keyframes blink {
+        75% { opacity: 0.0; }
+      }
+      .warning {
+        color: red;
+        animation: blink 1s step-end infinite;
+        -webkit-animation: blink 1s step-end infinite;
+      }
 
 body
-  //- TODO: timer
+  //- TODO: one time token
   .container
     canvas#canvas
     button#btn.btn.btn-primary.btn-block(type="button") 送信
     .divider
     button#undo.btn.btn-primary.btn-block(type="button") 一つ戻る
-    script.
-      const canvas = document.querySelector('#canvas');
-      const signaturePad = new SignaturePad(canvas, {
-        backgroundColor: 'rgb(238,238,238)',
-      });
+    span.countdown-timer 残り時間 <span id="time"></span>
 
-      $(window).on('load', function(){
-        canvas.setAttribute('width', $('.container').width());
-        canvas.setAttribute('height', window.innerHeight - $('#btn').outerHeight() - 25);
-        signaturePad.clear();
-        liff.init(function (data) {});
-        document.getElementById('undo').addEventListener('click', function () {
-          const data = signaturePad.toData();
-          if (data) {
-            data.pop(); // remove the last dot or line
-            signaturePad.fromData(data);
-          }
-        });
-      });
-      $('#btn').on('click', function() {
+    script.
+      // save image
+      const saveImage = () => {
+        console.log('saveImage!');
         const params = (new URL(document.location)).searchParams;
         const bundleId = (params != null && params.has("bundleId")) ? params.get("bundleId") : null;
         const userId = (params != null && params.has("userId")) ? params.get("userId") : null;
@@ -62,6 +62,10 @@ body
           },
           success: function (res, status) {
             console.log('res', res);
+            if (!res.success) {
+              console.log('request to /saveimage failed.')
+              console.log(res.message);
+            }
             if (userId != null) {
               liff.getProfile().then(function (profile) {
                 liff.sendMessages([
@@ -86,6 +90,62 @@ body
             window.alert('Error saving image: ' + res.status);
           },
           complete: function(data) {
+          }
+        });
+      };
+      $('#btn').on('click', saveImage);
+
+      // countdown timer
+      function startTimer(duration, display, callback) {
+        let left = duration;
+        let dom = display;
+        let minutes = 0;
+        let seconds = 0;
+        const isWarning = 20;
+        // in millisecond
+        const interval = 1000;
+        setInterval(() => {
+            minutes = parseInt(left / 60, 10)
+            seconds = parseInt(left % 60, 10);
+
+            minutes = minutes < 10 ? "0" + minutes : minutes;
+            seconds = seconds < 10 ? "0" + seconds : seconds;
+
+            dom.textContent = minutes + ":" + seconds;
+
+            // process after timer reaches 0
+            left -= (interval / 1000)
+            console.log('left', left)
+            if (left < isWarning) {
+              dom.classList.add('warning');
+            }
+            if (left == 0) {
+            //- if (left <= 0) {
+              callback();
+            }
+        }, interval);
+      }
+      $(window).on('load', () => {
+        const duration = 60;
+        const display = document.querySelector('#time');
+        startTimer(duration, display, saveImage);
+        //- startTimer(duration, display, callbackFunc);
+      });
+      // canvas
+      const canvas = document.querySelector('#canvas');
+      const signaturePad = new SignaturePad(canvas, {
+        backgroundColor: 'rgb(238,238,238)',
+      });
+      $(window).on('load', function(){
+        canvas.setAttribute('width', $('.container').width());
+        canvas.setAttribute('height', window.innerHeight - $('#btn').outerHeight() - 25);
+        signaturePad.clear();
+        liff.init(function (data) {});
+        document.getElementById('undo').addEventListener('click', function () {
+          const data = signaturePad.toData();
+          if (data) {
+            data.pop(); // remove the last dot or line
+            signaturePad.fromData(data);
           }
         });
       });

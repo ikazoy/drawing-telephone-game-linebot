@@ -43,6 +43,7 @@ router.post('/saveimage', async (req, res, text) => {
         console.log('err on liff.js putObject', err);
         response = res.json({
           success: false,
+          message: err,
         });
       } else {
         console.log('data on liff.js putObject', data);
