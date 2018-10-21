@@ -34,18 +34,30 @@ const construcMessage = (message) => {
 
 const replyText = (token, messages) => {
   const ms = Array.isArray(messages) ? messages : [messages];
-  return client.replyMessage(
-    token,
-    ms.map(element => construcMessage(element)),
-  );
+  let res;
+  try {
+    res = client.replyMessage(
+      token,
+      ms.map(element => construcMessage(element)),
+    );
+  } catch (err) {
+    console.log(err);
+  }
+  return res;
 };
 
 const pushMessage = (to, messages) => {
   const ms = Array.isArray(messages) ? messages : [messages];
-  return client.pushMessage(
-    to,
-    ms.map(element => construcMessage(element)),
-  );
+  let res;
+  try {
+    res = client.pushMessage(
+      to,
+      ms.map(element => construcMessage(element)),
+    );
+  } catch (err) {
+    console.log(err);
+  }
+  return res;
 };
 
 const getMemberProfile = async (memberId, bundleId, type) => {
