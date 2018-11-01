@@ -1,6 +1,6 @@
 #!/bin/bash
 
-cp_cmd="cp .env.dev .env"
+cp_cmd="cp .env.development .env"
 $cp_cmd
 
 sls_offline="yarn sls offline"
