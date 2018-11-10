@@ -9,6 +9,9 @@ provider:
   stage: development
   environment:
     NODE_ENV: ${opt:stage, self:provider.stage}
+    GAMES_DYNAMODB_TABLE: ${self:service}-games-${opt:stage, self:provider.stage}
+    OLD_GAMES_DYNAMODB_TABLE: ${self:service}-old-games-${opt:stage, self:provider.stage}
+    USERS_DYNAMODB_TABLE: ${self:service}-users-${opt:stage, self:provider.stage}
   iamRoleStatements:
       - Effect: "Allow"
         Action:
@@ -21,10 +24,87 @@ provider:
           - "lambda:InvokeFunction"
         Resource:
           - "*"
+      - Effect: Allow
+        Action:
+          - dynamodb:Query
+          - dynamodb:Scan
+          - dynamodb:GetItem
+          - dynamodb:PutItem
+          - dynamodb:UpdateItem
+          - dynamodb:DeleteItem
+        Resource:
+          - "arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${self:provider.environment.GAMES_DYNAMODB_TABLE}"
+          - "arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${self:provider.environment.OLD_GAMES_DYNAMODB_TABLE}"
+          - "arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${self:provider.environment.USERS_DYNAMODB_TABLE}"
+resources:
+  Resources:
+    GamesDynamoDbTable:
+      Type: AWS::DynamoDB::Table
+      DeletionPolicy: Retain
+      Properties:
+        AttributeDefinitions:
+          -
+            AttributeName: "BundleId"
+            AttributeType: "S"
+        KeySchema:
+          -
+            AttributeName: "BundleId"
+            KeyType: "HASH"
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        TableName: ${self:provider.environment.GAMES_DYNAMODB_TABLE}
+    OldGamesDynamoDbTable:
+      Type: AWS::DynamoDB::Table
+      DeletionPolicy: Retain
+      Properties:
+        AttributeDefinitions:
+          -
+            AttributeName: "BundleId"
+            AttributeType: "S"
+          -
+            AttributeName: "CreatedAt"
+            AttributeType: "S"
+        KeySchema:
+          -
+            AttributeName: "BundleId"
+            KeyType: "HASH"
+          - 
+            AttributeName: "CreatedAt"
+            KeyType: "RANGE"
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        TableName: ${self:provider.environment.OLD_GAMES_DYNAMODB_TABLE}
+    UsersDynamoDbTable:
+      Type: AWS::DynamoDB::Table
+      DeletionPolicy: Retain
+      Properties:
+        AttributeDefinitions:
+          -
+            AttributeName: "UserId"
+            AttributeType: "S"
+        KeySchema:
+          -
+            AttributeName: "UserId"
+            KeyType: "HASH"
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        TableName: ${self:provider.environment.USERS_DYNAMODB_TABLE}
 
-# 利用するプラグインについて
 plugins:
+  - serverless-dynamodb-local
   - serverless-offline
+
+# custom:
+#   dynamodb:
+#   # If you only want to use DynamoDB Local in some stages, declare them here
+#     stages:
+#       - dev
+#     start:
+#       port: 8000
+#       migrate: true
 
 # デプロイ時のパッケージの内容について
 # package:

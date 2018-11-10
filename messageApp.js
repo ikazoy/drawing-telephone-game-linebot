@@ -1,7 +1,6 @@
 const createError = require('http-errors');
 const express = require('express');
 const line = require('@line/bot-sdk');
-const admin = require('firebase-admin');
 const _ = require('underscore');
 const s3Lib = require('./libs/s3');
 const util = require('./libs/util');
@@ -15,71 +14,58 @@ async function isGuessingAnswerer(bundleId, userId) {
   if (bundleId == null || userId == null) {
     return false;
   }
-  const gameDocRef = firestore.latestGameDocRef(`${bundleId}-game`);
-  const docSnapshot = await gameDocRef.get();
-  if (docSnapshot.exists) {
-    const data = await docSnapshot.data();
-    return (data.usersIds[data.orders[data.currentIndex]] === userId && data.currentIndex != null && data.currentIndex % 2 === 1);
+  const latestGame = await firestore.latestGame(bundleId);
+  if (latestGame) {
+    return (latestGame.UsersIds[latestGame.Orders[latestGame.CurrentIndex]] === userId && latestGame.CurrentIndex != null && latestGame.CurrentIndex % 2 === 1);
   }
   return false;
 }
 
 async function handleText(message, replyToken, source) {
-  console.log('message', message);
-  console.log('source', source);
   const { text } = message;
+  console.log('source', source);
   if (/^url$/.test(text)) {
     return lineLib.replyText(replyToken, lineLib.buildLiffUrl());
   } if (/^参加$/.test(text)) {
     if (source.type === 'user') {
       return lineLib.replyText(replyToken, 'グループもしくはルームで遊んでください');
     }
-    // 処理
-    const gameDocRef = firestore.latestGameDocRefFromSource(source);
-    const docSnapshot = await gameDocRef.get();
-    if (docSnapshot.exists) {
-      const data = await docSnapshot.data();
-      // すでにゲーム中の場合
-      if (data.currentIndex > -1) {
-        return lineLib.replyText(replyToken, 'ゲーム続行中です。終了する場合は"終了"と送信してください。');
-      }
+    const bundleId = firestore.extractBundleId(source);
+    const latestGame = await firestore.latestGame(bundleId);
+    if (latestGame && latestGame.CurrentIndex > -1) {
+      return lineLib.replyText(replyToken, 'ゲーム続行中です。終了する場合は"終了"と送信してください。');
     }
     // update userlist
-    const sourceUserProfile = await lineLib.getMemberProfile(source.userId, firestore.extractBundleId(source), source.type);
-    const userId2DisplayName = {};
-    userId2DisplayName[source.userId] = sourceUserProfile.displayName;
-    await gameDocRef.set({
-      usersIds: admin.firestore.FieldValue.arrayUnion(source.userId),
-      userId2DisplayName: admin.firestore.FieldValue.arrayUnion(userId2DisplayName),
-    }, { merge: true });
+    const sourceUserProfile = await lineLib.getMemberProfile(source.userId, bundleId, source.type);
+    const res = await firestore.addUserToGame(
+      bundleId,
+      source.userId,
+      sourceUserProfile.displayName,
+    );
     let displayNames = [];
-    // NOTE: doen't accept method chain
-    // const uids2dn = await gameDocRef.get().get('userId2DisplayName');
-    const docSnapshot2 = await gameDocRef.get();
-    const uids2dn = docSnapshot2.get('userId2DisplayName');
-    if (uids2dn != null) {
-      displayNames = uids2dn.map(el => Object.values(el)[0]);
+    if (latestGame && latestGame.UserId2DisplayNames) {
+      displayNames = latestGame.UserId2DisplayNames.map(el => Object.values(el)[0]);
+    }
+    if (res) {
+      displayNames.push(sourceUserProfile.displayName);
     }
     // set users collection
-    const userDocRef = firestore.usersDocRef(source.userId);
-    await userDocRef.set({
-      bundleId: firestore.extractBundleId(source),
-    });
+    await firestore.putLatestBundleId(source.userId, firestore.extractBundleId(source));
     return lineLib.replyText(replyToken, `参加を受け付けました。\n\n現在の参加者一覧\n${displayNames.join('\n')}`);
   }
   if (/^結果発表$/.test(text) || /^次へ$/.test(text)) {
-    const gameDocRef = firestore.doneGameDocRefFromSource(source);
-    const docSnapshot = await gameDocRef.get();
-    const data = await docSnapshot.data();
-    const { currentAnnounceIndex, theme } = data;
-    if (!theme || !docSnapshot.exists) {
+    const bundleId = firestore.extractBundleId(source);
+    const latestGame = await firestore.latestGame(bundleId);
+    const currentAnnounceIndex = latestGame.CurrentAnnounceIndex;
+    const theme = latestGame.Theme;
+    if (latestGame === null || latestGame.Status !== 'done') {
       return lineLib.replyText(replyToken, '結果発表できるゲームが見つかりませんでした。再度最初からおためしください。');
     }
     // 結果発表開始
     if (currentAnnounceIndex === undefined) {
       const currentIndex = 0;
-      const firstPlayerUserId = data.usersIds[data.orders[currentIndex]];
-      const firstPlayerDisplayName = data.userId2DisplayName[data.orders[currentIndex]][firstPlayerUserId];
+      const firstPlayerUserId = latestGame.UsersIds[latestGame.Orders[currentIndex]];
+      const firstPlayerDisplayName = latestGame.UserId2DisplayNames[latestGame.Orders[currentIndex]][firstPlayerUserId];
       // 「次へ」を待たずにいきなりindex = 0の絵を送る
       const imageUrl = s3Lib.buildObjectUrl(
         firestore.extractBundleId(source),
@@ -96,11 +82,11 @@ async function handleText(message, replyToken, source) {
         },
         '「次へ」と送信すると、次の人の絵もしくは回答を見ることができます。',
       ]);
-      gameDocRef.update({ currentAnnounceIndex: 1 });
+      await firestore.updateGame(bundleId, { CurrentAnnounceIndex: 1 });
     } else if (currentAnnounceIndex > 0) {
       // 結果発表中
-      const targetPlayerUserId = data.usersIds[data.orders[currentAnnounceIndex]];
-      const targetPlayerDisplayName = data.userId2DisplayName[data.orders[currentAnnounceIndex]][targetPlayerUserId];
+      const targetPlayerUserId = latestGame.UsersIds[latestGame.Orders[currentAnnounceIndex]];
+      const targetPlayerDisplayName = latestGame.UserId2DisplayNames[latestGame.Orders[currentAnnounceIndex]][targetPlayerUserId];
       const messages = [];
       let additionalMessage;
       if (util.questionType(currentAnnounceIndex) === 'drawing') {
@@ -122,12 +108,9 @@ async function handleText(message, replyToken, source) {
         messages.push(`${targetPlayerDisplayName}さんはこの絵を「${answeredTheme}」だと答えました。`);
         additionalMessage = '最初のお題は最後の人まで正しく伝わったでしょうか？';
       }
-      gameDocRef.update({ currentAnnounceIndex: currentAnnounceIndex + 1 });
-      if (data.usersIds.length <= currentAnnounceIndex + 1) {
-        // 結果発表終了のためfirestore上のデータを移動
-        const oldGameCollectionRef = firestore.oldGameCollectionRef(`${(firestore.extractBundleId(source))}-game`);
-        oldGameCollectionRef.add(data);
-        gameDocRef.delete();
+      await firestore.updateGame(bundleId, { CurrentAnnounceIndex: currentAnnounceIndex + 1 });
+      if (latestGame.UsersIds.length <= currentAnnounceIndex + 1) {
+        await firestore.stashEndedGame(firestore.extractBundleId(source));
         // ありがとうメッセージ
         messages.push(`以上で結果発表は終了です。\n${additionalMessage}\n\n新しいお題で遊ぶには、各参加者が「参加」と送信した後に、「開始」と送信してください。`);
       }
@@ -135,8 +118,7 @@ async function handleText(message, replyToken, source) {
     }
   }
   if (/^終了$/.test(text)) {
-    const gameDocRef = firestore.latestGameDocRefFromSource(source);
-    gameDocRef.delete();
+    await firestore.stashEndedGame(firestore.extractBundleId(source));
     return lineLib.replyText(replyToken, 'ゲームを終了しました。再度ゲームを始める場合は、各参加者が「参加」と送信した後に、「開始」と送信してください。');
   } if (/^開始$/.test(text)) {
     if (source.type === 'user') {
@@ -146,19 +128,17 @@ async function handleText(message, replyToken, source) {
     // 2人以上でないとエラー
 
     // 順番、テーマ決め
-    const gameDocRef = firestore.latestGameDocRefFromSource(source);
-    const docSnapshot = await gameDocRef.get();
+    const latestGame = await firestore.latestGame(firestore.extractBundleId(source));
     let playersNum;
-    if (!docSnapshot.exists) {
+    if (!latestGame) {
       return lineLib.replyText(replyToken, 'エラーが発生しました。');
     }
-    const data = await docSnapshot.data();
     // すでにゲーム中の場合
-    if (data.currentIndex > -1) {
+    if (latestGame.CurrentIndex > -1) {
       return lineLib.replyText(replyToken, 'ゲーム続行中です。終了する場合は"終了"と送信してください。');
     }
     // 人数を取得
-    const uids2dn = data.userId2DisplayName;
+    const uids2dn = latestGame.UserId2DisplayNames;
     if (uids2dn == null) {
       playersNum = 0;
     } else {
@@ -168,15 +148,15 @@ async function handleText(message, replyToken, source) {
     const orders = _.shuffle(Array.from(Array(playersNum).keys()));
     const theme = themes[_.random(0, themes.length - 1)];
     // 保存
-    gameDocRef.update({
-      orders,
-      currentIndex: 0,
-      theme,
-    });
+    const param = {
+      Orders: orders,
+      CurrentIndex: 0,
+      Theme: theme,
+    };
+    await firestore.updateGame(firestore.extractBundleId(source), param);
     // 順番をユーザー名順に
     const orderedPlayers = orders.map(o => Object.values(uids2dn[o])[0]);
     const [firstPlayerUserId] = Object.keys(uids2dn[orders[0]]);
-    console.log('orderedPlayers', orderedPlayers);
     lineLib.pushMessage(firstPlayerUserId, `お題: 「${theme}」\nクリックしてから60秒以内に絵を書いてください。\n${lineLib.buildLiffUrl(firestore.extractBundleId(source), firstPlayerUserId, 0)}`);
     const messages = [
       `ゲームを開始します。\n\n順番はこちらです。\n${orderedPlayers.join('\n')}`,
@@ -193,7 +173,7 @@ async function handleText(message, replyToken, source) {
     }
     // s3にtextfileを保存
     console.log('now the user is guessing answerer');
-    const currentIndex = await firestore.currentIndex(bundleId);
+    const latestGame = await firestore.latestGame(bundleId);
     // TODO: bucket nameをserverless.ymlと共通化する
     // https://serverless.com/framework/docs/providers/aws/guide/variables#reference-variables-in-javascript-files
     // TODO: bucketのアクセス権限を治す
@@ -204,7 +184,7 @@ async function handleText(message, replyToken, source) {
     await s3Lib.s3.putObject(
       Object.assign(
         params,
-        s3Lib.bucketKeyParam(bundleId, currentIndex, source.userId),
+        s3Lib.bucketKeyParam(bundleId, latestGame.CurrentIndex, source.userId),
       ),
       (err, data) => {
         if (err) {
@@ -270,13 +250,35 @@ function handleEvent(event) {
 
 const app = express();
 
-app.post('/webhook', line.middleware(lineLib.config), async (req, res) => {
-  try {
-    const result = await req.body.events.map(handleEvent);
-    res.json(result);
-  } catch (err) {
-    console.log(err);
-  }
+app.post('/webhook', line.middleware(lineLib.config), (req, res) => {
+  // try {
+  //   const result = req.body.events.map(await handleEvent);
+  //   res.json(result);
+  // } catch (err) {
+  //   console.log(err);
+  // }
+  // Promise
+  //   .all(req.body.events.map(handleEvent))
+  //   .then(result => res.json(result));
+
+  // 受信したメッセージイベントを処理
+  const promises = req.body.events.map((event) => {
+    const promise = handleEvent(event);
+    return promise;
+  });
+
+  // メッセージごとの処理はPromiseで実行
+  Promise
+    .all(promises)
+    .then((value) => {
+      // 処理が全て正常終了すれば、HTTP STATUS CODE 200を返す
+      res.json({ success: true });
+    })
+    .catch((error) => {
+      // 異常終了があれば、HTTP STATUS CODE 500を返す
+      console.log('Error!: ', error);
+      return res.status(500).json({});
+    });
 });
 
 // catch 404 and forward to error handler
