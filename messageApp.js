@@ -26,9 +26,19 @@ async function handleText(message, replyToken, source) {
   console.log('source', source);
   if (/^url$/.test(text)) {
     return lineLib.replyText(replyToken, lineLib.buildLiffUrl());
+  } if (/^ヘルプ$/.test(text)) {
+    const helpText = `コマンド一覧
+参加：ゲームに参加することができます。
+開始：参加登録されているメンバーでゲームを開始します。
+終了：現在進行中のゲームを強制終了し、参加者をリセットします。
+スキップ：順番を1つ飛ばして次のプレイヤーに移ります。（ゲーム開始後のみ有効）
+結果発表：全員の順番が終了した際に結果発表を開始します。（ゲーム終了直後のみ有効）
+次へ：次のプレイヤー分の結果発表に移ります。（ゲーム終了後の結果発表中のみ有効）
+ヘルプ：コマンド一覧を確認できます。`;
+    return lineLib.replyText(replyToken, helpText);
   } if (/^参加$/.test(text)) {
     if (source.type === 'user') {
-      return lineLib.replyText(replyToken, 'グループもしくはルームで遊んでください');
+      return lineLib.replyText(replyToken, 'グループもしくはルームでのみ有効です。');
     }
     const bundleId = firestore.extractBundleId(source);
     const latestGame = await firestore.latestGame(bundleId);
@@ -51,7 +61,7 @@ async function handleText(message, replyToken, source) {
     }
     // set users collection
     await firestore.putLatestBundleId(source.userId, firestore.extractBundleId(source));
-    return lineLib.replyText(replyToken, `参加を受け付けました。\n\n現在の参加者一覧\n${displayNames.join('\n')}`);
+    return lineLib.replyText(replyToken, `参加を受け付けました。参加者が揃ったら「開始」と送信してください。\n\n現在の参加者一覧\n${displayNames.join('\n')}`);
   }
   if (/^結果発表$/.test(text) || /^次へ$/.test(text)) {
     const bundleId = firestore.extractBundleId(source);
@@ -59,7 +69,7 @@ async function handleText(message, replyToken, source) {
     const currentAnnounceIndex = latestGame.CurrentAnnounceIndex;
     const theme = latestGame.Theme;
     if (latestGame === null || latestGame.Status !== 'done') {
-      return lineLib.replyText(replyToken, '結果発表できるゲームが見つかりませんでした。再度最初からおためしください。');
+      return lineLib.replyText(replyToken, '結果発表できるゲームが見つかりませんでした。');
     }
     // 結果発表開始
     if (currentAnnounceIndex === undefined) {
@@ -124,7 +134,7 @@ async function handleText(message, replyToken, source) {
     return lineLib.replyText(replyToken, 'ゲームを終了しました。再度ゲームを始める場合は、各参加者が「参加」と送信した後に、「開始」と送信してください。');
   } if (/^開始$/.test(text)) {
     if (source.type === 'user') {
-      return lineLib.replyText(replyToken, 'グループもしくはルームで遊んでください');
+      return lineLib.replyText(replyToken, 'グループもしくはルームで遊んでください。');
     }
     // TODO: validate
     // 2人以上でないとエラー
@@ -210,11 +220,25 @@ async function handleText(message, replyToken, source) {
   return 1;
 }
 
+async function handleFollow(replyToken) {
+  console.log('follow!!');
+  const onFollowMessage = `友達追加ありがとうございます。
+私は複数人のトークグループやルームでお絵かき伝言ゲームを楽しむためのお手伝いをします。
+一緒にゲームを遊びたい友人や家族とグループを作成して、私を招待してください。`;
+  return lineLib.replyText(replyToken, onFollowMessage);
+}
+
+async function handleJoin(replyToken) {
+  console.log('join!!');
+  const onJoinMessage = `ゲームに参加したい人は「参加」と送信してください。
+参加者が揃ったら「開始」と送信してください。
+万が一ゲームを途中で終了したい、やり直したい場合「終了」と送信してください。
+詳しい使い方を見るには「ヘルプ」と送信してください。`;
+  return lineLib.replyText(replyToken, onJoinMessage);
+}
+
 
 function handleEvent(event) {
-  if (event.type !== 'message' || event.message.type !== 'text') {
-    return Promise.resolve(null);
-  }
   switch (event.type) {
     case 'message': {
       const { message } = event;
@@ -240,10 +264,15 @@ function handleEvent(event) {
         //   return handleSticker(message, event.replyToken);
         // }
         default: {
-          console.log('this is default');
-          throw new Error(`Unknown message: ${JSON.stringify(message)}`);
+          return Promise.resolve(null);
         }
       }
+    }
+    case 'follow': {
+      return handleFollow(event.replyToken);
+    }
+    case 'join': {
+      return handleJoin(event.replyToken);
     }
     default: {
       return Promise.resolve(null);
