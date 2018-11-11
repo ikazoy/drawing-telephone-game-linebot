@@ -8,12 +8,12 @@ const util = require('./libs/util');
 // yarn run sls invoke local --function triggeredBySavedImage -p s3Object-event.json
 module.exports.triggeredBySavedImage = (event, context, callback) => {
   const changedObject = event.Records[0].s3.object;
+  // actual example of objectKey
+  // Rd4ae3efbe814c9219965368a7932d7a7/20181110T07%3A22%3A04.222Z/0-Uceb4ceddcf7c2f2a508aa245469320e9.jpeg
   const objectKey = changedObject.key;
-  const regex = /(\w+)\/([0-9]+)-(\w+)\.(\w+)/;
+  const regex = /(\w+)\/(.+)\/([0-9]+)-(\w+)\.(\w+)/;
   const regexResult = objectKey.match(regex);
-  const [str, bundleId, indexOfImage, userId, prefix] = regexResult;
-  // R0424f09e0bd8f1fc7c7e99d260933373/0-Uceb4ceddcf7c2f2a508aa245469320e9.jepg
-  console.log('objectKey', objectKey);
+  const [str, bundleId, gameId, indexOfImage, userId, prefix] = regexResult;
   const lambda = new aws.Lambda();
   const payload = {
     bundleId,
@@ -60,12 +60,12 @@ module.exports.sendNext = async (event, context, callback) => {
     const nextUserId = latestGame.UsersIds[nextUserIndex];
     const nextUserDisplayName = Object.values(latestGame.UserId2DisplayNames[nextUserIndex])[0];
     if (util.questionType(nextIndex) === 'drawing') {
-      const s3Object = await s3Lib.getObject(bundleId, nextIndex - 1, currentUserId);
+      const s3Object = await s3Lib.getObject(bundleId, latestGame.GameId, nextIndex - 1, currentUserId);
       const theme = s3Object.Body.toString();
-      lineLib.pushMessage(nextUserId, `${currentUserDisplayName}さんから回ってきたお題は「${theme}」です。\n以下のURLをクリックして60秒以内に絵を描いてください。\n${lineLib.buildLiffUrl(bundleId, nextUserId, nextIndex)}`);
+      lineLib.pushMessage(nextUserId, `${currentUserDisplayName}さんから回ってきたお題は「${theme}」です。\n以下のURLをクリックして60秒以内に絵を描いてください。\n${lineLib.buildLiffUrl(bundleId, latestGame.GameId, nextUserId, nextIndex)}`);
       publicMessage = `${currentUserDisplayName}さんが回答しました。${nextUserDisplayName}さんはお題に沿って絵を描いてください。`;
     } else if (util.questionType(nextIndex) === 'guessing') {
-      const imageUrl = s3Lib.buildObjectUrl(bundleId, nextIndex - 1, currentUserId);
+      const imageUrl = s3Lib.buildObjectUrl(bundleId, latestGame.GameId, nextIndex - 1, currentUserId);
       console.log('imageUrl', imageUrl);
       const messages = [
         `${currentUserDisplayName}さんが描いた絵はこちらです。何の絵に見えますか？`,

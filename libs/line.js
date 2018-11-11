@@ -69,11 +69,14 @@ const getMemberProfile = async (memberId, bundleId, type) => {
   }
   return profile;
 };
-const buildLiffUrl = (bundleId, userId, currentIndex) => {
+const buildLiffUrl = (bundleId, gameId, userId, currentIndex) => {
   const liffUrl = process.env.LIFF_URL;
   const params = {};
   if (bundleId != null) {
     params.bundleId = bundleId;
+  }
+  if (gameId != null) {
+    params.gameId = gameId;
   }
   if (userId != null) {
     params.userId = userId;

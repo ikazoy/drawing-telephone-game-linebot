@@ -69,6 +69,7 @@ async function handleText(message, replyToken, source) {
       // 「次へ」を待たずにいきなりindex = 0の絵を送る
       const imageUrl = s3Lib.buildObjectUrl(
         firestore.extractBundleId(source),
+        latestGame.GameId,
         currentIndex,
         firstPlayerUserId,
       );
@@ -92,6 +93,7 @@ async function handleText(message, replyToken, source) {
       if (util.questionType(currentAnnounceIndex) === 'drawing') {
         const imageUrl = s3Lib.buildObjectUrl(
           firestore.extractBundleId(source),
+          latestGame.GameId,
           currentAnnounceIndex,
           targetPlayerUserId,
         );
@@ -103,7 +105,7 @@ async function handleText(message, replyToken, source) {
         });
         additionalMessage = '最後の絵はどうでしたか？みんなで点数をつけてみると面白いかもしれませんよ。';
       } else if (util.questionType(currentAnnounceIndex) === 'guessing') {
-        const s3Object = await s3Lib.getObject(firestore.extractBundleId(source), currentAnnounceIndex, targetPlayerUserId);
+        const s3Object = await s3Lib.getObject(bundleId, latestGame.GameId, currentAnnounceIndex, targetPlayerUserId);
         const answeredTheme = s3Object.Body.toString();
         messages.push(`${targetPlayerDisplayName}さんはこの絵を「${answeredTheme}」だと答えました。`);
         additionalMessage = '最初のお題は最後の人まで正しく伝わったでしょうか？';
@@ -128,7 +130,8 @@ async function handleText(message, replyToken, source) {
     // 2人以上でないとエラー
 
     // 順番、テーマ決め
-    const latestGame = await firestore.latestGame(firestore.extractBundleId(source));
+    const bundleId = firestore.extractBundleId(source);
+    const latestGame = await firestore.latestGame(bundleId);
     let playersNum;
     if (!latestGame) {
       return lineLib.replyText(replyToken, 'エラーが発生しました。');
@@ -153,11 +156,12 @@ async function handleText(message, replyToken, source) {
       CurrentIndex: 0,
       Theme: theme,
     };
-    await firestore.updateGame(firestore.extractBundleId(source), param);
+    await firestore.updateGame(bundleId, param);
     // 順番をユーザー名順に
     const orderedPlayers = orders.map(o => Object.values(uids2dn[o])[0]);
     const [firstPlayerUserId] = Object.keys(uids2dn[orders[0]]);
-    lineLib.pushMessage(firstPlayerUserId, `お題: 「${theme}」\nクリックしてから60秒以内に絵を書いてください。\n${lineLib.buildLiffUrl(firestore.extractBundleId(source), firstPlayerUserId, 0)}`);
+    console.log(latestGame);
+    lineLib.pushMessage(firstPlayerUserId, `お題: 「${theme}」\nクリックしてから60秒以内に絵を書いてください。\n${lineLib.buildLiffUrl(bundleId, latestGame.GameId, firstPlayerUserId, 0)}`);
     const messages = [
       `ゲームを開始します。\n\n順番はこちらです。\n${orderedPlayers.join('\n')}`,
       `${orderedPlayers[0]}さんにお題を送信しました。\n60秒以内に絵を書いてください`,
@@ -184,7 +188,7 @@ async function handleText(message, replyToken, source) {
     await s3Lib.s3.putObject(
       Object.assign(
         params,
-        s3Lib.bucketKeyParam(bundleId, latestGame.CurrentIndex, source.userId),
+        s3Lib.bucketKeyParam(bundleId, latestGame.GameId, latestGame.CurrentIndex, source.userId),
       ),
       (err, data) => {
         if (err) {

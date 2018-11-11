@@ -52,27 +52,35 @@ const latestBundleIdOfUser = async (userId) => {
   return null;
 };
 
+function buildGameId(isoString) {
+  return isoString.replace(/-/g, '');
+}
+
 const addUserToGame = async (bundleId, userId, displayName) => {
-  if (await latestGame(bundleId) == null) {
+  const lg = await latestGame(bundleId);
+  if (lg == null) {
     const now = new Date();
+    const createdAt = now.toISOString();
     const createParams = {
       TableName: process.env.GAMES_DYNAMODB_TABLE,
       Key: {
         BundleId: bundleId,
       },
-      UpdateExpression: 'set #createdAt = :now',
+      UpdateExpression: 'set #createdAt = :now, #gameId = :gameId',
       ExpressionAttributeNames: {
         '#createdAt': 'CreatedAt',
+        '#gameId': 'GameId',
       },
       ExpressionAttributeValues: {
-        ':now': now.toISOString(),
+        ':now': createdAt,
+        ':gameId': buildGameId(createdAt),
       },
     };
-    let res;
     try {
-      res = await docClient.update(createParams).promise();
+      await docClient.update(createParams).promise();
     } catch (err) {
-      console.log('ERROR', err);
+      console.log('ERROR on Dynamodb update in create phase of addUserToGame', err);
+      console.log('createParams', createParams);
     }
   }
   const addUserParams = {
@@ -103,7 +111,7 @@ const addUserToGame = async (bundleId, userId, displayName) => {
     if (err.code && err.code === 'ConditionalCheckFailedException') {
       console.debug(`addUserToGame is skipped because the user ${userId} is already added to game in ${bundleId}. `);
     } else {
-      console.log('ERROR', err);
+      console.log('ERROR on Dynamodb update in add phase of addUserToGame', err);
     }
     res = false;
   }
@@ -143,6 +151,9 @@ const updateGame = async (bundleId, updateValues) => {
 // move a record from "games" to "old-games" table
 const stashEndedGame = async (bundleId) => {
   const lg = await latestGame(bundleId);
+  if (lg == null) {
+    return;
+  }
   const delteParams = {
     TableName: process.env.GAMES_DYNAMODB_TABLE,
     Key: {
@@ -158,10 +169,12 @@ const stashEndedGame = async (bundleId) => {
       try {
         await docClient.put(putParams).promise();
       } catch (e) {
-        console.log('ERROR', e);
+        console.log('ERROR on Dynamodb put in stashEndedGame', e);
+        console.log('putParams', putParams);
       }
     } else {
-      console.log('ERROR', err);
+      console.log('ERROR on Dynamodb delte in stashEndedGame', err);
+      console.log('deleteParams', delteParams);
     }
   });
 };

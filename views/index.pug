@@ -45,26 +45,29 @@ body
     script.
       // save image
       const saveImage = () => {
-        console.log('saveImage!');
         const params = (new URL(document.location)).searchParams;
         const bundleId = (params != null && params.has("bundleId")) ? params.get("bundleId") : null;
+        const gameId = (params != null && params.has("bundleId")) ? params.get("gameId") : null;
         const userId = (params != null && params.has("userId")) ? params.get("userId") : null;
         const currentIndex = (params != null && params.has("currentIndex")) ? params.get("currentIndex") : null;
+        const currentPath = window.location.pathname;
+        const saveImagePath = currentPath.replace(/\/liff/, '/saveimage')
 
         $.ajax({
           type: 'POST',
-          url: '/saveimage',
+          url: saveImagePath,
           data: {
             'image': signaturePad.toDataURL('image/jpeg'),
-            'bundleId': bundleId,
-            'currentIndex': currentIndex,
-            'userId': userId,
+            bundleId,
+            gameId,
+            currentIndex,
+            userId,
           },
           success: function (res, status) {
             console.log('res', res);
             if (!res.success) {
-              console.log('request to /saveimage failed.')
-              console.log(res.message);
+              window.alert('request to /saveimage failed.')
+              window.alert(res.message);
             }
             if (userId != null) {
               liff.getProfile().then(function (profile) {

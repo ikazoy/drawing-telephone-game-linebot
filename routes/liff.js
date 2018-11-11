@@ -35,8 +35,9 @@ router.post('/saveimage', async (req, res, text) => {
     Body: imageBuffer.data,
     ACL: 'public-read',
   };
+  // TODO: check if bundleId and gameId exists
   await s3.putObject(
-    Object.assign(params, s3Lib.bucketKeyParam(req.body.bundleId, req.body.currentIndex, req.body.userId)),
+    Object.assign(params, s3Lib.bucketKeyParam(req.body.bundleId, req.body.gameId, req.body.currentIndex, req.body.userId)),
     (err, data) => {
       let response;
       if (err) {
@@ -49,7 +50,7 @@ router.post('/saveimage', async (req, res, text) => {
         console.log('data on liff.js putObject', data);
         response = res.json({
           success: true,
-          filePath: s3Lib.buildObjectUrl(req.body.bundleId, req.body.currentIndex, req.body.userId),
+          filePath: s3Lib.buildObjectUrl(req.body.bundleId, req.body.gameId, req.body.currentIndex, req.body.userId),
         });
       }
       return response;
