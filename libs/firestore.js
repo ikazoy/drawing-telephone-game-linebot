@@ -179,6 +179,47 @@ const stashEndedGame = async (bundleId) => {
   });
 };
 
+const skipCurrentUser = async (bundleId) => {
+  const lg = await latestGame(bundleId);
+  // currentIndex means who is in turn currently in 'Orders' array
+  const currentIndex = lg.CurrentIndex;
+  // Orders array contains indecies of 'UsersIds' indecies according to actual 'order'
+  // e.g. UsersIds: ['bob', 'alice', 'john'] / Orders: [1, 2, 0]
+  // -> Order of users to answer is 'alice', 'john', 'bob'
+  const currentUserIndex = lg.Orders[currentIndex];
+  // remove the skipped item from these 3 arrays
+  lg.Orders.splice(currentIndex, 1);
+  const newOrders = lg.Orders.map(o => ((o > currentUserIndex) ? o - 1 : 0));
+  // NOTE: splice returns 'array' consists of deleted items
+  const deletedUserId = lg.UsersIds.splice(currentUserIndex, 1);
+  const deletedUser = lg.UserId2DisplayNames.splice(currentUserIndex, 1);
+  const updateValues = {
+    Orders: newOrders,
+    UsersIds: lg.UsersIds,
+    UserId2DisplayNames: lg.UserId2DisplayNames,
+  };
+  const updateExpression = dynamodbUpdateExpression.getUpdateExpression({}, updateValues);
+  const params = Object.assign({
+    TableName: process.env.GAMES_DYNAMODB_TABLE,
+    Key: {
+      BundleId: bundleId,
+    },
+  }, updateExpression);
+  try {
+    await docClient.update(params).promise();
+  } catch (err) {
+    console.log('ERROR', err);
+    return false;
+  }
+  return {
+    userId: Object.keys(deletedUser[0])[0],
+    displayName: Object.values(deletedUser[0])[0],
+  };
+};
+
+// TODO: 実装
+const isGameMaster = async (bundleId, userId) => true;
+
 module.exports = {
   extractBundleId,
   putLatestBundleId,
@@ -187,4 +228,6 @@ module.exports = {
   addUserToGame,
   stashEndedGame,
   updateGame,
+  skipCurrentUser,
+  isGameMaster,
 };

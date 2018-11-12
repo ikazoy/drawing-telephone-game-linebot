@@ -1,6 +1,5 @@
 const line = require('@line/bot-sdk');
-// TODO: hide this
-// eslint-disable-next-line
+
 const accessToken = process.env.LINE_ACCESS_TOKEN;
 const secret = process.env.LINE_SECRET;
 const config = {

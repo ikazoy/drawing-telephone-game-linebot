@@ -5,10 +5,9 @@ const _ = require('underscore');
 const s3Lib = require('./libs/s3');
 const util = require('./libs/util');
 const themes = require('./libs/themes');
-
+const lambda = require('./libs/lambda');
 const firestore = require('./libs/firestore');
 const lineLib = require('./libs/line');
-
 
 async function isGuessingAnswerer(bundleId, userId) {
   if (bundleId == null || userId == null) {
@@ -36,6 +35,20 @@ async function handleText(message, replyToken, source) {
 次へ：次のプレイヤー分の結果発表に移ります。（ゲーム終了後の結果発表中のみ有効）
 ヘルプ：コマンド一覧を確認できます。`;
     return lineLib.replyText(replyToken, helpText);
+  } if (/^スキップ$/.test(text)) {
+    const bundleId = firestore.extractBundleId(source);
+    const { userId } = source;
+    if (!await firestore.isGameMaster(bundleId, userId)) {
+      return lineLib.replyText(replyToken, 'スキップできるのはゲームマスターのみです。');
+    }
+    const skippedUser = await firestore.skipCurrentUser(bundleId);
+    if (!skippedUser) {
+      return lineLib.replyText(replyToken, 'エラーが発生しました');
+    }
+    console.log('skippedUser', skippedUser);
+    const latestGame = await firestore.latestGame(bundleId);
+    lambda.invokeSendNext(bundleId, latestGame.CurrentIndex + 1);
+    return lineLib.replyText(replyToken, `${skippedUser.displayName}さんの順番はスキップされました。`);
   } if (/^参加$/.test(text)) {
     if (source.type === 'user') {
       return lineLib.replyText(replyToken, 'グループもしくはルームでのみ有効です。');
@@ -61,7 +74,7 @@ async function handleText(message, replyToken, source) {
     }
     // set users collection
     await firestore.putLatestBundleId(source.userId, firestore.extractBundleId(source));
-    return lineLib.replyText(replyToken, `参加を受け付けました。参加者が揃ったら「開始」と送信してください。\n\n現在の参加者一覧\n${displayNames.join('\n')}`);
+    return lineLib.replyText(replyToken, `参加を受け付けました。参加者が揃ったら「開始」と送信してください。\n(参加者は私と友達になっている必要があります)\n\n現在の参加者一覧\n${displayNames.join('\n')}`);
   }
   if (/^結果発表$/.test(text) || /^次へ$/.test(text)) {
     const bundleId = firestore.extractBundleId(source);
@@ -167,16 +180,11 @@ async function handleText(message, replyToken, source) {
       Theme: theme,
     };
     await firestore.updateGame(bundleId, param);
-    // 順番をユーザー名順に
-    const orderedPlayers = orders.map(o => Object.values(uids2dn[o])[0]);
-    const [firstPlayerUserId] = Object.keys(uids2dn[orders[0]]);
-    console.log(latestGame);
-    lineLib.pushMessage(firstPlayerUserId, `お題: 「${theme}」\nクリックしてから60秒以内に絵を書いてください。\n${lineLib.buildLiffUrl(bundleId, latestGame.GameId, firstPlayerUserId, 0)}`);
-    const messages = [
-      `ゲームを開始します。\n\n順番はこちらです。\n${orderedPlayers.join('\n')}`,
-      `${orderedPlayers[0]}さんにお題を送信しました。\n60秒以内に絵を書いてください`,
-    ];
-    return lineLib.replyText(replyToken, messages);
+    const updatedLatestGame = Object.assign(latestGame, param);
+    const publicMessage = util.buildFirstPublicMessage(updatedLatestGame);
+    const privateMessage = util.buildFirstPrivateMessage(updatedLatestGame);
+    lineLib.pushMessage(util.firstUserId(updatedLatestGame), privateMessage);
+    return lineLib.replyText(replyToken, publicMessage);
   }
   // 回答の場合
   if (source.type === 'user') {
@@ -221,7 +229,6 @@ async function handleText(message, replyToken, source) {
 }
 
 async function handleFollow(replyToken) {
-  console.log('follow!!');
   const onFollowMessage = `友達追加ありがとうございます。
 私は複数人のトークグループやルームでお絵かき伝言ゲームを楽しむためのお手伝いをします。
 一緒にゲームを遊びたい友人や家族とグループを作成して、私を招待してください。`;
@@ -229,7 +236,6 @@ async function handleFollow(replyToken) {
 }
 
 async function handleJoin(replyToken) {
-  console.log('join!!');
   const onJoinMessage = `ゲームに参加したい人は「参加」と送信してください。
 参加者が揃ったら「開始」と送信してください。
 万が一ゲームを途中で終了したい、やり直したい場合「終了」と送信してください。

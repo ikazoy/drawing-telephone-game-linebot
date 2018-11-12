@@ -1,12 +1,12 @@
 require('dotenv').config();
-const aws = require('aws-sdk');
 const firestore = require('./libs/firestore');
 const lineLib = require('./libs/line');
 const s3Lib = require('./libs/s3');
 const util = require('./libs/util');
+const lambda = require('./libs/lambda');
 
 // yarn run sls invoke local --function triggeredBySavedImage -p s3Object-event.json
-module.exports.triggeredBySavedImage = (event, context, callback) => {
+module.exports.triggeredBySavedImage = async (event, context, callback) => {
   const changedObject = event.Records[0].s3.object;
   // actual example of objectKey
   // Rd4ae3efbe814c9219965368a7932d7a7/20181110T07%3A22%3A04.222Z/0-Uceb4ceddcf7c2f2a508aa245469320e9.jpeg
@@ -14,27 +14,18 @@ module.exports.triggeredBySavedImage = (event, context, callback) => {
   const regex = /(\w+)\/(.+)\/([0-9]+)-(\w+)\.(\w+)/;
   const regexResult = objectKey.match(regex);
   const [str, bundleId, gameId, indexOfImage, userId, prefix] = regexResult;
-  const lambda = new aws.Lambda();
-  const payload = {
-    bundleId,
-    nextIndex: Number(indexOfImage) + 1,
-  };
-  const opts = {
-    FunctionName: `liff-test-${process.env.NODE_ENV}-sendNext`,
-    Payload: JSON.stringify(payload),
-  };
-  lambda.invoke(opts, (err, data) => {
-    if (err) {
-      console.log(`error : ${err}`);
-      callback(err, null);
-    } else if (data) {
-      const response = {
-        statusCode: 200,
-        body: '{"msg": "success"}',
-      };
-      callback(null, response);
-    }
-  });
+  const nextIndex = Number(indexOfImage) + 1;
+  const res = await lambda.invokeSendNext(bundleId, nextIndex);
+  if (res.err) {
+    console.log(`error : ${res.err}`);
+    callback(res.err, null);
+  } else if (res) {
+    const response = {
+      statusCode: 200,
+      body: '{"msg": "success"}',
+    };
+    callback(null, response);
+  }
 };
 
 // yarn run sls invoke local --function sendNext -p sendNext-event.json
@@ -42,12 +33,16 @@ module.exports.sendNext = async (event, context, callback) => {
   const { bundleId, nextIndex } = event;
   let publicMessage;
   const latestGame = await firestore.latestGame(bundleId);
-  console.log('latestGame in sendNext', JSON.stringify(latestGame));
   const currentUserIndex = latestGame.Orders[nextIndex - 1];
   const currentUserId = latestGame.UsersIds[currentUserIndex];
-  const currentUserDisplayName = Object.values(latestGame.UserId2DisplayNames[currentUserIndex])[0];
-  // 人数分終了
-  if (latestGame.CurrentIndex + 1 >= latestGame.UsersIds.length) {
+  const currentUserDisplayName = (currentUserIndex >= 0) ? Object.values(latestGame.UserId2DisplayNames[currentUserIndex])[0] : '';
+  if (nextIndex === 1) {
+    // special case: the first user is skipped by the command
+    publicMessage = util.buildFirstPublicMessage(latestGame, { retry: 1 });
+    const privateMessage = util.buildFirstPrivateMessage(latestGame);
+    lineLib.pushMessage(util.firstUserId(latestGame), privateMessage);
+  } else if (latestGame.CurrentIndex + 1 >= latestGame.UsersIds.length) {
+    // 人数分終了
     await firestore.updateGame(bundleId, { Status: 'done' });
     if (util.questionType(nextIndex) === 'drawing') {
       publicMessage = `${currentUserDisplayName}さんが回答しました。以上でゲームは終了です。結果発表を見る場合は「結果発表」と送信してください。`;
