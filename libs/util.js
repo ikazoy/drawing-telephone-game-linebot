@@ -21,7 +21,29 @@ const buildFirstPublicMessage = (latestGame, opts) => {
   }
   return messages;
 };
-const buildFirstPrivateMessage = latestGame => `お題: 「${latestGame.Theme}」\nクリックしてから60秒以内に絵を書いてください。\n${lineLib.buildLiffUrl(latestGame.BundleId, latestGame.GameId, firstUserId(latestGame), 0)}`;
+// const buildFirstPrivateMessage = latestGame => `お題: 「${latestGame.Theme}」\nクリックしてから60秒以内に絵を書いてください。\n${lineLib.buildLiffUrl(latestGame.BundleId, latestGame.GameId, firstUserId(latestGame), 0)}`;
+const buildFirstPrivateMessage = (latestGame) => {
+  const liffUrl = lineLib.buildLiffUrl(latestGame.BundleId, latestGame.GameId, firstUserId(latestGame), 0);
+  return {
+    type: 'template',
+    altText: 'お絵かき伝言ゲームのお題が届いています',
+    template: {
+      type: 'buttons',
+      // thumbnailImageUrl: thumbnail_url,
+      imageAspectRatio: 'rectangle',
+      imageSize: 'contain',
+      title: `お題:${latestGame.Theme}`,
+      text: 'クリックしてから60秒以内に絵を描いてください。',
+      actions: [
+        {
+          type: 'uri',
+          label: 'お絵かき開始',
+          uri: liffUrl,
+        },
+      ],
+    },
+  };
+};
 
 module.exports = {
   questionType,

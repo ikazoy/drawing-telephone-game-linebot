@@ -12,7 +12,7 @@ function serialize(obj) {
   return `?${Object.keys(obj).reduce((a, k) => { a.push(`${k}=${encodeURIComponent(obj[k])}`); return a; }, []).join('&')}`;
 }
 
-const construcMessage = (message) => {
+const constructMessage = (message) => {
   let constructedMessage;
   if (typeof message === 'object') {
     if (message.type === 'image') {
@@ -21,6 +21,8 @@ const construcMessage = (message) => {
         originalContentUrl: message.originalContentUrl,
         previewImageUrl: message.previewImageUrl,
       };
+    } else if (message.type === 'template') {
+      constructedMessage = message;
     }
   } else if (typeof message === 'string' || typeof message === 'number') {
     constructedMessage = {
@@ -37,7 +39,7 @@ const replyText = (token, messages) => {
   try {
     res = client.replyMessage(
       token,
-      ms.map(element => construcMessage(element)),
+      ms.map(element => constructMessage(element)),
     );
   } catch (err) {
     console.log(err);
@@ -51,7 +53,7 @@ const pushMessage = (to, messages) => {
   try {
     res = client.pushMessage(
       to,
-      ms.map(element => construcMessage(element)),
+      ms.map(element => constructMessage(element)),
     );
   } catch (err) {
     console.log(err);
