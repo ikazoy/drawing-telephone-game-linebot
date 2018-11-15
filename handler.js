@@ -32,17 +32,15 @@ module.exports.triggeredBySavedImage = async (event, context, callback) => {
 // yarn run sls invoke local --function sendNext -p sendNext-event.json
 module.exports.sendNext = async (event, context, callback) => {
   const { bundleId, nextIndex } = event;
-  let publicMessage;
   const latestGame = await firestore.latestGame(bundleId);
   const currentUserIndex = latestGame.Orders[nextIndex - 1];
   const currentUserId = latestGame.UsersIds[currentUserIndex];
   const currentUserDisplayName = (currentUserIndex >= 0) ? Object.values(latestGame.UserId2DisplayNames[currentUserIndex])[0] : '';
-  if (nextIndex === 1) {
-    // special case: the first user is skipped by the command
-    publicMessage = util.buildFirstPublicMessage(latestGame, { retry: 1 });
-    const privateMessage = util.buildFirstPrivateMessage(latestGame);
-    lineLib.pushMessage(util.firstUserId(latestGame), privateMessage);
-  } else if (latestGame.CurrentIndex + 1 >= latestGame.UsersIds.length) {
+  let nextUserId;
+  let publicMessage;
+  let privateMessage;
+  // nextIndex = 0 is a special case: the first user is skipped by the command
+  if (latestGame.CurrentIndex + 1 >= latestGame.UsersIds.length && nextIndex !== 0) {
     // 人数分終了
     await firestore.updateGame(bundleId, { Status: 'done' });
     if (util.questionType(nextIndex) === 'drawing') {
@@ -65,17 +63,22 @@ module.exports.sendNext = async (event, context, callback) => {
   } else {
     // 1. 次の順番のユーザーにメッセージを送る
     const nextUserIndex = latestGame.Orders[nextIndex];
-    const nextUserId = latestGame.UsersIds[nextUserIndex];
+    nextUserId = latestGame.UsersIds[nextUserIndex];
     const nextUserDisplayName = Object.values(latestGame.UserId2DisplayNames[nextUserIndex])[0];
     if (util.questionType(nextIndex) === 'drawing') {
-      const s3Object = await s3Lib.getObject(bundleId, latestGame.GameId, nextIndex - 1, currentUserId);
-      const theme = s3Object.Body.toString();
-      lineLib.pushMessage(nextUserId, `${currentUserDisplayName}さんから回ってきたお題は「${theme}」です。\n以下のURLをクリックして60秒以内に絵を描いてください。\n${lineLib.buildLiffUrl(bundleId, latestGame.GameId, nextUserId, nextIndex)}`);
-      publicMessage = `${currentUserDisplayName}さんが回答しました。${nextUserDisplayName}さんはお題に沿って絵を描いてください。`;
+      if (nextIndex === 0) {
+        publicMessage = util.buildFirstPublicMessage(latestGame);
+        privateMessage = util.buildFirstPrivateMessage(latestGame);
+      } else {
+        const s3Object = await s3Lib.getObject(bundleId, latestGame.GameId, nextIndex - 1, currentUserId);
+        const theme = s3Object.Body.toString();
+        privateMessage = `${currentUserDisplayName}さんから回ってきたお題は「${theme}」です。\n以下のURLをクリックして60秒以内に絵を描いてください。\n${lineLib.buildLiffUrl(bundleId, latestGame.GameId, nextUserId, nextIndex)}`;
+        publicMessage = `${currentUserDisplayName}さんが回答しました。${nextUserDisplayName}さんはお題に沿って絵を描いてください。`;
+      }
     } else if (util.questionType(nextIndex) === 'guessing') {
       const imageUrl = s3Lib.buildObjectUrl(bundleId, latestGame.GameId, nextIndex - 1, currentUserId);
       console.log('imageUrl', imageUrl);
-      const messages = [
+      privateMessage = [
         `${currentUserDisplayName}さんが描いた絵はこちらです。何の絵に見えますか？`,
         {
           type: 'image',
@@ -83,15 +86,18 @@ module.exports.sendNext = async (event, context, callback) => {
           previewImageUrl: imageUrl,
         },
       ];
-      lineLib.pushMessage(nextUserId, messages);
       publicMessage = `${currentUserDisplayName}さんが絵を描き終わりました。${nextUserDisplayName}さんは絵を見て予想してください`;
     }
     // 2. firestoreの情報をupdate
     await firestore.updateGame(bundleId, { CurrentIndex: nextIndex });
     await firestore.putLatestBundleId(nextUserId, bundleId);
   }
-  // 全体にメッセージを送る
-  lineLib.pushMessage(bundleId, publicMessage);
+  if (publicMessage !== null) {
+    lineLib.pushMessage(bundleId, publicMessage);
+  }
+  if (privateMessage !== null) {
+    lineLib.pushMessage(nextUserId, privateMessage);
+  }
 
   const response = {
     statusCode: 200,
