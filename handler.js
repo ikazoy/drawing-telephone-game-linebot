@@ -4,6 +4,7 @@ const lineLib = require('./libs/line');
 const s3Lib = require('./libs/s3');
 const util = require('./libs/util');
 const lambda = require('./libs/lambda');
+const quickReply = require('./libs/line/quickReply');
 
 // yarn run sls invoke local --function triggeredBySavedImage -p s3Object-event.json
 module.exports.triggeredBySavedImage = async (event, context, callback) => {
@@ -45,9 +46,21 @@ module.exports.sendNext = async (event, context, callback) => {
     // 人数分終了
     await firestore.updateGame(bundleId, { Status: 'done' });
     if (util.questionType(nextIndex) === 'drawing') {
-      publicMessage = `${currentUserDisplayName}さんが回答しました。以上でゲームは終了です。結果発表を見る場合は「結果発表」と送信してください。`;
+      publicMessage = {
+        type: 'text',
+        text: `${currentUserDisplayName}さんが回答しました。以上でゲームは終了です。結果発表を見る場合は「結果発表」と送信してください。`,
+        quickReply: {
+          items: [quickReply.announce],
+        },
+      };
     } else if (util.questionType(nextIndex) === 'guessing') {
-      publicMessage = `${currentUserDisplayName}さんが絵を描き終わりました。以上でゲームは終了です。結果発表を見る場合は「結果発表」と送信してください。`;
+      publicMessage = {
+        type: 'text',
+        text: `${currentUserDisplayName}さんが絵を描き終わりました。以上でゲームは終了です。結果発表を見る場合は「結果発表」と送信してください。`,
+        quickReply: {
+          items: [quickReply.announce],
+        },
+      };
     }
   } else {
     // 1. 次の順番のユーザーにメッセージを送る

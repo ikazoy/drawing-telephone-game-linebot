@@ -21,7 +21,7 @@ const constructMessage = (message) => {
         originalContentUrl: message.originalContentUrl,
         previewImageUrl: message.previewImageUrl,
       };
-    } else if (message.type === 'template') {
+    } else if (message.type === 'template' || (message.type === 'text' && message.quickReply)) {
       constructedMessage = message;
     }
   } else if (typeof message === 'string' || typeof message === 'number') {
