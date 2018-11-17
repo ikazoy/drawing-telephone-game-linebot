@@ -1,9 +1,15 @@
+const _ = require('underscore');
 const lineLib = require('./line');
+const themes = require('./themes');
 
 const questionType = targetIndex => ((targetIndex % 2 === 0) ? 'drawing' : 'guessing');
 const fileSuffix = targetIndex => ((targetIndex % 2 === 0) ? 'jpeg' : 'txt');
 const firstUserId = (latestGame) => {
   const [firstPlayerUserId] = Object.keys(latestGame.UserId2DisplayNames[latestGame.Orders[0]]);
+  return firstPlayerUserId;
+};
+const firstUserDisplayName = (latestGame) => {
+  const [firstPlayerUserId] = Object.values(latestGame.UserId2DisplayNames[latestGame.Orders[0]]);
   return firstPlayerUserId;
 };
 const buildFirstPublicMessage = (latestGame, opts) => {
@@ -21,7 +27,6 @@ const buildFirstPublicMessage = (latestGame, opts) => {
   }
   return messages;
 };
-// const buildFirstPrivateMessage = latestGame => `お題: 「${latestGame.Theme}」\nクリックしてから60秒以内に絵を書いてください。\n${lineLib.buildLiffUrl(latestGame.BundleId, latestGame.GameId, firstUserId(latestGame), 0)}`;
 const buildFirstPrivateMessage = (latestGame) => {
   const liffUrl = lineLib.buildLiffUrl(latestGame.BundleId, latestGame.GameId, firstUserId(latestGame), 0);
   return {
@@ -33,7 +38,7 @@ const buildFirstPrivateMessage = (latestGame) => {
       imageAspectRatio: 'rectangle',
       imageSize: 'contain',
       title: `お題:${latestGame.Theme}`,
-      text: 'クリックしてから60秒以内に絵を描いてください。',
+      text: 'クリックしてから60秒以内に絵を描いてください。お題の意味が万が一わからない場合は「チェンジ」と送信することでお題を変更できます。（最大2回まで）',
       actions: [
         {
           type: 'uri',
@@ -44,11 +49,29 @@ const buildFirstPrivateMessage = (latestGame) => {
     },
   };
 };
+const canChangeTheme = (userId, latestGame) => {
+  const maximumThemeUpdatedTimes = 2;
+  if (userId === firstUserId(latestGame)) {
+    if (latestGame.ThemeUpdatedTimes && latestGame.ThemeUpdatedTimes >= maximumThemeUpdatedTimes) {
+      return {
+        error: 'maximum times reached',
+      };
+    }
+    return true;
+  }
+  return {
+    error: 'not first player',
+  };
+};
+const pickTheme = () => themes[_.random(0, themes.length - 1)];
 
 module.exports = {
   questionType,
   fileSuffix,
   firstUserId,
+  firstUserDisplayName,
   buildFirstPublicMessage,
   buildFirstPrivateMessage,
+  canChangeTheme,
+  pickTheme,
 };

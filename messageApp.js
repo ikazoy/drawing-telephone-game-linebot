@@ -4,7 +4,6 @@ const line = require('@line/bot-sdk');
 const _ = require('underscore');
 const s3Lib = require('./libs/s3');
 const util = require('./libs/util');
-const themes = require('./libs/themes');
 const lambda = require('./libs/lambda');
 const firestore = require('./libs/firestore');
 const lineLib = require('./libs/line');
@@ -25,16 +24,16 @@ async function handleText(message, replyToken, source) {
   const { text } = message;
   // DM、グループ、room共通メッセージ
   if (/^ヘルプ$/.test(text)) {
-    const helpText = `コマンド一覧
-参加：ゲームに参加することができます。
-開始：参加登録されているメンバーでゲームを開始します。
-終了：現在進行中のゲームを強制終了し、参加者をリセットします。（ゲーム開始前、開始後どちらも有効）
-スキップ：順番を1つ飛ばして次のプレイヤーに移ります。（ゲーム開始後のみ有効）
-結果発表：全員の順番が終了した際に結果発表を開始します。（ゲーム終了直後のみ有効）
-次へ：次のプレイヤー分の結果発表に移ります。（ゲーム終了後の結果発表中のみ有効）
-ヘルプ：コマンド一覧を確認できます。
+    const helpText = `コマンド一覧👀
+🙌参加：ゲームに参加することができます。
+▶️開始：参加登録されているメンバーでゲームを開始します。
+⛔️終了：現在進行中のゲームを強制終了し、参加者をリセットします。（ゲーム開始前、開始後どちらも有効）
+🚫スキップ：順番を1つ飛ばして次のプレイヤーに移ります。（ゲーム開始後のみ有効）
+📢結果発表：全員の順番が終了した際に結果発表を開始します。（ゲーム終了直後のみ有効）
+⏭次へ：次のプレイヤー分の結果発表に移ります。（ゲーム終了後の結果発表中のみ有効）
+🆘ヘルプ：コマンド一覧を確認できます。
 
-それぞれのコマンドはゲームの流れに合わせて表示されるボタンを押す、もしくは直接テキストメッセージを送信することで実行できます。
+それぞれのコマンドはゲームの流れに合わせて表示されるボタンを押す、もしくは直接テキストメッセージを送信することで実行できます👌
 `;
     return lineLib.replyText(replyToken, helpText);
   }
@@ -218,12 +217,11 @@ async function handleText(message, replyToken, source) {
       }
       // 順番、お題を決定（範囲を作成、シャッフル)
       const orders = _.shuffle(Array.from(Array(playersNum).keys()));
-      const theme = themes[_.random(0, themes.length - 1)];
       // 保存
       const param = {
         Orders: orders,
         CurrentIndex: 0,
-        Theme: theme,
+        Theme: util.pickTheme(),
       };
       await firestore.updateGame(bundleId, param);
       const updatedLatestGame = Object.assign(latestGame, param);
@@ -238,18 +236,49 @@ async function handleText(message, replyToken, source) {
     if (/^開始$/.test(text) || /^参加$/.test(text) || /^終了$/.test(text)) {
       return lineLib.replyText(replyToken, 'グループもしくはルームで遊んでください。');
     }
+    const bundleId = await firestore.latestBundleIdOfUser(source.userId);
+    const latestGame = await firestore.latestGame(bundleId);
+
     // お題変更コマンド
-    // TODO: 実装
+    if (/^チェンジ$/.test(text)) {
+      // check if user is eligible to change the them
+      const res = util.canChangeTheme(source.userId, latestGame);
+      if (res.error) {
+        let reply;
+        switch (res.error) {
+          case 'maximum times reached': {
+            reply = 'テーマを変えられる回数が上限に達しています。';
+            break;
+          }
+          case 'not first player': {
+            reply = 'テーマを変えられるのは最初のプレイヤーだけです。';
+            break;
+          }
+          default: {
+            reply = 'エラーが発生しました。';
+            break;
+          }
+        }
+        return lineLib.replyText(replyToken, reply);
+      }
+      const updatedLatestGame = await firestore.swapTheme(latestGame);
+      if (updatedLatestGame.Theme == null) {
+        return lineLib.replyText(replyToken, 'エラーが発生しました。');
+      }
+      // 返信 to DM
+      const privateMessage = util.buildFirstPrivateMessage(updatedLatestGame);
+      lineLib.replyText(replyToken, privateMessage);
+      // 返信 to public
+      return lineLib.pushMessage(latestGame.BundleId, `${util.firstUserDisplayName(updatedLatestGame)}さんがお題を変更しました。`);
+    }
 
     // 回答
-    const bundleId = await firestore.latestBundleIdOfUser(source.userId);
     const resGuessingAnswerer = await isGuessingAnswerer(bundleId, source.userId);
     if (!resGuessingAnswerer) {
       return lineLib.replyText(replyToken, '回答者になってからもう一度お答えください。');
     }
     // s3にtextfileを保存
     console.log('now the user is guessing answerer');
-    const latestGame = await firestore.latestGame(bundleId);
     // TODO: bucket nameをserverless.ymlと共通化する
     // https://serverless.com/framework/docs/providers/aws/guide/variables#reference-variables-in-javascript-files
     // TODO: bucketのアクセス権限を治す

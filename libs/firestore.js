@@ -1,6 +1,7 @@
 const dynamodb = require('serverless-dynamodb-client');
 const AWS = require('aws-sdk');
 const dynamodbUpdateExpression = require('dynamodb-update-expression');
+const util = require('./util');
 
 AWS.config.update({
   region: 'ap-northeast-1',
@@ -217,6 +218,33 @@ const skipCurrentUser = async (bundleId) => {
   };
 };
 
+const swapTheme = async (game) => {
+  const prevTheme = game.Theme;
+  const prevTimes = Number(game.ThemeUpdatedTimes) || 0;
+  let newTheme;
+  while (newTheme === undefined || prevTheme === newTheme) {
+    newTheme = util.pickTheme();
+  }
+  const updateValues = {
+    Theme: newTheme,
+    ThemeUpdatedTimes: prevTimes + 1,
+  };
+  const updateExpression = dynamodbUpdateExpression.getUpdateExpression({}, updateValues);
+  const params = Object.assign({
+    TableName: process.env.GAMES_DYNAMODB_TABLE,
+    Key: {
+      BundleId: game.BundleId,
+    },
+  }, updateExpression);
+  try {
+    await docClient.update(params).promise();
+  } catch (err) {
+    console.log('ERROR', err);
+    return false;
+  }
+  return Object.assign(game, updateValues);
+};
+
 // TODO: 実装
 const isGameMaster = async (bundleId, userId) => true;
 
@@ -229,5 +257,6 @@ module.exports = {
   stashEndedGame,
   updateGame,
   skipCurrentUser,
+  swapTheme,
   isGameMaster,
 };
