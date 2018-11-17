@@ -23,10 +23,8 @@ async function isGuessingAnswerer(bundleId, userId) {
 
 async function handleText(message, replyToken, source) {
   const { text } = message;
-  console.log('source', source);
-  if (/^url$/.test(text)) {
-    return lineLib.replyText(replyToken, lineLib.buildLiffUrl());
-  } if (/^ヘルプ$/.test(text)) {
+  // DM、グループ、room共通メッセージ
+  if (/^ヘルプ$/.test(text)) {
     const helpText = `コマンド一覧
 参加：ゲームに参加することができます。
 開始：参加登録されているメンバーでゲームを開始します。
@@ -39,200 +37,211 @@ async function handleText(message, replyToken, source) {
 それぞれのコマンドはゲームの流れに合わせて表示されるボタンを押す、もしくは直接テキストメッセージを送信することで実行できます。
 `;
     return lineLib.replyText(replyToken, helpText);
-  } if (/^スキップ$/.test(text)) {
-    const bundleId = firestore.extractBundleId(source);
-    const { userId } = source;
-    if (!await firestore.isGameMaster(bundleId, userId)) {
-      return lineLib.replyText(replyToken, 'スキップできるのはゲームマスターのみです。');
+  }
+
+  // ルームもしくはグループのみ
+  if (source.type === 'room' || source.type === 'group') {
+    if (/^スキップ$/.test(text)) {
+      const bundleId = firestore.extractBundleId(source);
+      const { userId } = source;
+      if (!await firestore.isGameMaster(bundleId, userId)) {
+        return lineLib.replyText(replyToken, 'スキップできるのはゲームマスターのみです。');
+      }
+      const skippedUser = await firestore.skipCurrentUser(bundleId);
+      if (!skippedUser) {
+        return lineLib.replyText(replyToken, 'エラーが発生しました');
+      }
+      console.log('skippedUser', skippedUser);
+      const latestGame = await firestore.latestGame(bundleId);
+      lambda.invokeSendNext(bundleId, latestGame.CurrentIndex);
+      return lineLib.replyText(replyToken, `${skippedUser.displayName}さんの順番はスキップされました。`);
     }
-    const skippedUser = await firestore.skipCurrentUser(bundleId);
-    if (!skippedUser) {
-      return lineLib.replyText(replyToken, 'エラーが発生しました');
-    }
-    console.log('skippedUser', skippedUser);
-    const latestGame = await firestore.latestGame(bundleId);
-    lambda.invokeSendNext(bundleId, latestGame.CurrentIndex);
-    return lineLib.replyText(replyToken, `${skippedUser.displayName}さんの順番はスキップされました。`);
-  } if (/^参加$/.test(text)) {
-    if (source.type === 'user') {
-      return lineLib.replyText(replyToken, 'グループもしくはルームでのみ有効です。');
-    }
-    const bundleId = firestore.extractBundleId(source);
-    const latestGame = await firestore.latestGame(bundleId);
-    if (latestGame && latestGame.CurrentIndex > -1) {
+    if (/^参加$/.test(text)) {
+      const bundleId = firestore.extractBundleId(source);
+      const latestGame = await firestore.latestGame(bundleId);
+      if (latestGame && latestGame.CurrentIndex > -1) {
+        return lineLib.replyText(replyToken,
+          {
+            type: 'text',
+            text: 'ゲーム続行中です。終了する場合は"終了"と送信してください。',
+            quickReply: {
+              items: [quickReply.stop, quickReply.help],
+            },
+          });
+      }
+      // update userlist
+      const sourceUserProfile = await lineLib.getMemberProfile(source.userId, bundleId, source.type);
+      const res = await firestore.addUserToGame(
+        bundleId,
+        source.userId,
+        sourceUserProfile.displayName,
+      );
+      let displayNames = [];
+      if (latestGame && latestGame.UserId2DisplayNames) {
+        displayNames = latestGame.UserId2DisplayNames.map(el => Object.values(el)[0]);
+      }
+      if (res) {
+        displayNames.push(sourceUserProfile.displayName);
+      }
+      // set users collection
+      await firestore.putLatestBundleId(source.userId, firestore.extractBundleId(source));
       return lineLib.replyText(replyToken,
         {
           type: 'text',
-          text: 'ゲーム続行中です。終了する場合は"終了"と送信してください。',
+          text: `参加を受け付けました。参加者が揃ったら「開始」と送信してください。\n(参加者は私と友達になっている必要があります)\n\n現在の参加者一覧\n${displayNames.join('\n')}`,
           quickReply: {
-            items: [quickReply.stop, quickReply.help],
+            items: [quickReply.participate, quickReply.start, quickReply.help],
           },
         });
     }
-    // update userlist
-    const sourceUserProfile = await lineLib.getMemberProfile(source.userId, bundleId, source.type);
-    const res = await firestore.addUserToGame(
-      bundleId,
-      source.userId,
-      sourceUserProfile.displayName,
-    );
-    let displayNames = [];
-    if (latestGame && latestGame.UserId2DisplayNames) {
-      displayNames = latestGame.UserId2DisplayNames.map(el => Object.values(el)[0]);
-    }
-    if (res) {
-      displayNames.push(sourceUserProfile.displayName);
-    }
-    // set users collection
-    await firestore.putLatestBundleId(source.userId, firestore.extractBundleId(source));
-    return lineLib.replyText(replyToken,
-      {
-        type: 'text',
-        text: `参加を受け付けました。参加者が揃ったら「開始」と送信してください。\n(参加者は私と友達になっている必要があります)\n\n現在の参加者一覧\n${displayNames.join('\n')}`,
-        quickReply: {
-          items: [quickReply.participate, quickReply.start, quickReply.help],
-        },
-      });
-  }
-  if (/^結果発表$/.test(text) || /^次へ$/.test(text)) {
-    const bundleId = firestore.extractBundleId(source);
-    const latestGame = await firestore.latestGame(bundleId);
-    const currentAnnounceIndex = latestGame.CurrentAnnounceIndex || 0;
-    const theme = latestGame.Theme;
-    if (latestGame === null || latestGame.Status !== 'done') {
-      return lineLib.replyText(replyToken, '結果発表できるゲームが見つかりませんでした。');
-    }
-    let messages = [];
-    let additionalMessage;
-    // 結果発表開始
-    if (latestGame.CurrentAnnounceIndex === undefined) {
-      const currentIndex = 0;
-      const firstPlayerUserId = latestGame.UsersIds[latestGame.Orders[currentIndex]];
-      const firstPlayerDisplayName = latestGame.UserId2DisplayNames[latestGame.Orders[currentIndex]][firstPlayerUserId];
-      // 「次へ」を待たずにいきなりindex = 0の絵を送る
-      const imageUrl = s3Lib.buildObjectUrl(
-        firestore.extractBundleId(source),
-        latestGame.GameId,
-        currentIndex,
-        firstPlayerUserId,
-      );
-      messages = [].concat([
-        `それでは結果発表です\n\nお題は「${theme}」でした！`,
-        `${firstPlayerDisplayName}さんが描いた絵はこちら`,
-        {
-          type: 'image',
-          originalContentUrl: imageUrl,
-          previewImageUrl: imageUrl,
-        },
-      ]);
-      await firestore.updateGame(bundleId, { CurrentAnnounceIndex: 1 });
-    } else if (currentAnnounceIndex > 0) {
-      // 結果発表中
-      const targetPlayerUserId = latestGame.UsersIds[latestGame.Orders[currentAnnounceIndex]];
-      const targetPlayerDisplayName = latestGame.UserId2DisplayNames[latestGame.Orders[currentAnnounceIndex]][targetPlayerUserId];
-      if (util.questionType(currentAnnounceIndex) === 'drawing') {
+    if (/^結果発表$/.test(text) || /^次へ$/.test(text)) {
+      if (source.type === 'user') {
+        return lineLib.replyText(replyToken, 'グループもしくはルームでのみ有効です。');
+      }
+      const bundleId = firestore.extractBundleId(source);
+      const latestGame = await firestore.latestGame(bundleId);
+      const currentAnnounceIndex = latestGame.CurrentAnnounceIndex || 0;
+      const theme = latestGame.Theme;
+      if (latestGame === null || latestGame.Status !== 'done') {
+        return lineLib.replyText(replyToken, '結果発表できるゲームが見つかりませんでした。');
+      }
+      let messages = [];
+      let additionalMessage;
+      // 結果発表開始
+      if (latestGame.CurrentAnnounceIndex === undefined) {
+        const currentIndex = 0;
+        const firstPlayerUserId = latestGame.UsersIds[latestGame.Orders[currentIndex]];
+        const firstPlayerDisplayName = latestGame.UserId2DisplayNames[latestGame.Orders[currentIndex]][firstPlayerUserId];
+        // 「次へ」を待たずにいきなりindex = 0の絵を送る
         const imageUrl = s3Lib.buildObjectUrl(
           firestore.extractBundleId(source),
           latestGame.GameId,
-          currentAnnounceIndex,
-          targetPlayerUserId,
+          currentIndex,
+          firstPlayerUserId,
         );
-        messages.push(`${targetPlayerDisplayName}さんが描いた絵はこちら`);
-        messages.push({
-          type: 'image',
-          originalContentUrl: imageUrl,
-          previewImageUrl: imageUrl,
-        });
-      } else if (util.questionType(currentAnnounceIndex) === 'guessing') {
-        const s3Object = await s3Lib.getObject(bundleId, latestGame.GameId, currentAnnounceIndex, targetPlayerUserId);
-        const answeredTheme = s3Object.Body.toString();
-        messages.push(`${targetPlayerDisplayName}さんはこの絵を「${answeredTheme}」だと答えました。`);
+        messages = [].concat([
+          `それでは結果発表です\n\nお題は「${theme}」でした！`,
+          `${firstPlayerDisplayName}さんが描いた絵はこちら`,
+          {
+            type: 'image',
+            originalContentUrl: imageUrl,
+            previewImageUrl: imageUrl,
+          },
+        ]);
+        await firestore.updateGame(bundleId, { CurrentAnnounceIndex: 1 });
+      } else if (currentAnnounceIndex > 0) {
+        // 結果発表中
+        const targetPlayerUserId = latestGame.UsersIds[latestGame.Orders[currentAnnounceIndex]];
+        const targetPlayerDisplayName = latestGame.UserId2DisplayNames[latestGame.Orders[currentAnnounceIndex]][targetPlayerUserId];
+        if (util.questionType(currentAnnounceIndex) === 'drawing') {
+          const imageUrl = s3Lib.buildObjectUrl(
+            firestore.extractBundleId(source),
+            latestGame.GameId,
+            currentAnnounceIndex,
+            targetPlayerUserId,
+          );
+          messages.push(`${targetPlayerDisplayName}さんが描いた絵はこちら`);
+          messages.push({
+            type: 'image',
+            originalContentUrl: imageUrl,
+            previewImageUrl: imageUrl,
+          });
+        } else if (util.questionType(currentAnnounceIndex) === 'guessing') {
+          const s3Object = await s3Lib.getObject(bundleId, latestGame.GameId, currentAnnounceIndex, targetPlayerUserId);
+          const answeredTheme = s3Object.Body.toString();
+          messages.push(`${targetPlayerDisplayName}さんはこの絵を「${answeredTheme}」だと答えました。`);
+        }
+        await firestore.updateGame(bundleId, { CurrentAnnounceIndex: currentAnnounceIndex + 1 });
       }
-      await firestore.updateGame(bundleId, { CurrentAnnounceIndex: currentAnnounceIndex + 1 });
+      if (latestGame.UsersIds.length <= currentAnnounceIndex + 1) {
+        if (util.questionType(currentAnnounceIndex) === 'drawing') {
+          additionalMessage = '最後の絵はどうでしたか？みんなで点数をつけてみると面白いかもしれませんよ。';
+        } else if (util.questionType(currentAnnounceIndex) === 'guessing') {
+          additionalMessage = '最初のお題は最後の人まで正しく伝わったでしょうか？';
+        }
+        await firestore.stashEndedGame(firestore.extractBundleId(source));
+        // ありがとうメッセージ
+        messages.push(
+          {
+            type: 'text',
+            text: `以上で結果発表は終了です。\n${additionalMessage}\n\n新しいお題で遊ぶには、各参加者が「参加」と送信した後に、「開始」と送信してください。`,
+            quickReply: {
+              items: [quickReply.participate],
+            },
+          },
+        );
+      } else {
+        messages.push(
+          {
+            type: 'text',
+            text: '「次へ」と送信すると、次の人の絵もしくは回答を見ることができます。',
+            quickReply: {
+              items: [quickReply.next, quickReply.help],
+            },
+          },
+        );
+      }
+      return lineLib.replyText(replyToken, messages);
     }
-    if (latestGame.UsersIds.length <= currentAnnounceIndex + 1) {
-      if (util.questionType(currentAnnounceIndex) === 'drawing') {
-        additionalMessage = '最後の絵はどうでしたか？みんなで点数をつけてみると面白いかもしれませんよ。';
-      } else if (util.questionType(currentAnnounceIndex) === 'guessing') {
-        additionalMessage = '最初のお題は最後の人まで正しく伝わったでしょうか？';
-      }
+    if (/^終了$/.test(text)) {
       await firestore.stashEndedGame(firestore.extractBundleId(source));
-      // ありがとうメッセージ
-      messages.push(
-        {
-          type: 'text',
-          text: `以上で結果発表は終了です。\n${additionalMessage}\n\n新しいお題で遊ぶには、各参加者が「参加」と送信した後に、「開始」と送信してください。`,
-          quickReply: {
-            items: [quickReply.participate],
-          },
+      const endMessage = {
+        type: 'text',
+        text: 'ゲームを終了しました。再度ゲームを始める場合は、各参加者が「参加」と送信した後に、「開始」と送信してください。',
+        quickReply: {
+          items: [quickReply.participate],
         },
-      );
-    } else {
-      messages.push(
-        {
-          type: 'text',
-          text: '「次へ」と送信すると、次の人の絵もしくは回答を見ることができます。',
-          quickReply: {
-            items: [quickReply.next, quickReply.help],
-          },
-        },
-      );
+      };
+      return lineLib.replyText(replyToken, endMessage);
     }
-    return lineLib.replyText(replyToken, messages);
+    if (/^開始$/.test(text)) {
+      // TODO: validate
+      // 2人以上でないとエラー
+
+      // 順番、テーマ決め
+      const bundleId = firestore.extractBundleId(source);
+      const latestGame = await firestore.latestGame(bundleId);
+      let playersNum;
+      if (!latestGame) {
+        return lineLib.replyText(replyToken, 'エラーが発生しました。');
+      }
+      // すでにゲーム中の場合
+      if (latestGame.CurrentIndex > -1) {
+        return lineLib.replyText(replyToken, 'ゲーム続行中です。終了する場合は"終了"と送信してください。');
+      }
+      // 人数を取得
+      const uids2dn = latestGame.UserId2DisplayNames;
+      if (uids2dn == null) {
+        playersNum = 0;
+      } else {
+        playersNum = uids2dn.length;
+      }
+      // 順番、お題を決定（範囲を作成、シャッフル)
+      const orders = _.shuffle(Array.from(Array(playersNum).keys()));
+      const theme = themes[_.random(0, themes.length - 1)];
+      // 保存
+      const param = {
+        Orders: orders,
+        CurrentIndex: 0,
+        Theme: theme,
+      };
+      await firestore.updateGame(bundleId, param);
+      const updatedLatestGame = Object.assign(latestGame, param);
+      const publicMessage = util.buildFirstPublicMessage(updatedLatestGame);
+      const privateMessage = util.buildFirstPrivateMessage(updatedLatestGame);
+      lineLib.pushMessage(util.firstUserId(updatedLatestGame), privateMessage);
+      return lineLib.replyText(replyToken, publicMessage);
+    }
   }
-  if (/^終了$/.test(text)) {
-    await firestore.stashEndedGame(firestore.extractBundleId(source));
-    const endMessage = {
-      type: 'text',
-      text: 'ゲームを終了しました。再度ゲームを始める場合は、各参加者が「参加」と送信した後に、「開始」と送信してください。',
-      quickReply: {
-        items: [quickReply.participate],
-      },
-    };
-    return lineLib.replyText(replyToken, endMessage);
-  } if (/^開始$/.test(text)) {
-    if (source.type === 'user') {
+  if (source.type === 'user') {
+    // publicコマンドへの反応
+    if (/^開始$/.test(text) || /^参加$/.test(text) || /^終了$/.test(text)) {
       return lineLib.replyText(replyToken, 'グループもしくはルームで遊んでください。');
     }
-    // TODO: validate
-    // 2人以上でないとエラー
+    // お題変更コマンド
+    // TODO: 実装
 
-    // 順番、テーマ決め
-    const bundleId = firestore.extractBundleId(source);
-    const latestGame = await firestore.latestGame(bundleId);
-    let playersNum;
-    if (!latestGame) {
-      return lineLib.replyText(replyToken, 'エラーが発生しました。');
-    }
-    // すでにゲーム中の場合
-    if (latestGame.CurrentIndex > -1) {
-      return lineLib.replyText(replyToken, 'ゲーム続行中です。終了する場合は"終了"と送信してください。');
-    }
-    // 人数を取得
-    const uids2dn = latestGame.UserId2DisplayNames;
-    if (uids2dn == null) {
-      playersNum = 0;
-    } else {
-      playersNum = uids2dn.length;
-    }
-    // 順番、お題を決定（範囲を作成、シャッフル)
-    const orders = _.shuffle(Array.from(Array(playersNum).keys()));
-    const theme = themes[_.random(0, themes.length - 1)];
-    // 保存
-    const param = {
-      Orders: orders,
-      CurrentIndex: 0,
-      Theme: theme,
-    };
-    await firestore.updateGame(bundleId, param);
-    const updatedLatestGame = Object.assign(latestGame, param);
-    const publicMessage = util.buildFirstPublicMessage(updatedLatestGame);
-    const privateMessage = util.buildFirstPrivateMessage(updatedLatestGame);
-    lineLib.pushMessage(util.firstUserId(updatedLatestGame), privateMessage);
-    return lineLib.replyText(replyToken, publicMessage);
-  }
-  // 回答の場合
-  if (source.type === 'user') {
+    // 回答
     const bundleId = await firestore.latestBundleIdOfUser(source.userId);
     const resGuessingAnswerer = await isGuessingAnswerer(bundleId, source.userId);
     if (!resGuessingAnswerer) {
