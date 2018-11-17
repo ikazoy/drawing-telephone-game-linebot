@@ -9,6 +9,7 @@ html(lang="ja")
     script(src="https://cdn.jsdelivr.net/npm/signature_pad@2.3.2/dist/signature_pad.min.js")
     script(src="https://d.line-scdn.net/liff/1.0/sdk.js")
     script(src="https://unpkg.com/axios/dist/axios.min.js")
+    script(src="https://cdnjs.cloudflare.com/ajax/libs/jquery-loading-overlay/2.1.6/loadingoverlay.min.js")
     style(type="text/css").
       table {
         width: 100%
@@ -52,6 +53,7 @@ body
         const currentIndex = (params != null && params.has("currentIndex")) ? params.get("currentIndex") : null;
         const currentPath = window.location.pathname;
         const saveImagePath = currentPath.replace(/\/liff/, '/saveimage')
+        $.LoadingOverlay("show");
 
         $.ajax({
           type: 'POST',
@@ -90,6 +92,7 @@ body
             }
           },
           error: function (res) {
+            $.LoadingOverlay("hide");
             window.alert('Error saving image: ' + res.status);
           },
           complete: function(data) {
