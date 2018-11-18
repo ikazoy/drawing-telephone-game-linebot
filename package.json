@@ -5,11 +5,14 @@
   "scripts": {
     "dev": "sh ./bin/host-dev-env.sh",
     "deploy": "cp .env.development .env && sls deploy --stage development -v",
-    "deploy-prod": "cp .env.production .env && sls deploy --stage production -v"
+    "deploy-prod": "cp .env.production .env && sls deploy --stage production -v",
+    "deploy-client": "yarn --cwd liff run build && sls client deploy --stage development -v",
+    "deploy-client-prod": "yarn --cwd liff run build && sls client deploy --stage production -v"
   },
   "dependencies": {
     "@google-cloud/firestore": "^0.17.0",
     "@line/bot-sdk": "^6.3.0",
+    "@vue/cli": "^3.1.3",
     "aws-sdk": "^2.353.0",
     "aws-serverless-express": "^3.2.0",
     "body-parser": "^1.18.3",
@@ -27,6 +30,7 @@
     "pug": "2.0.0-beta11",
     "serverless-dynamodb-client": "^0.0.2",
     "serverless-dynamodb-local": "^0.2.35",
+    "serverless-finch": "^2.3.2",
     "underscore": "^1.9.1"
   },
   "devDependencies": {
