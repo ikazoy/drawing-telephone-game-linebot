@@ -13,35 +13,40 @@ const firstUserDisplayName = (latestGame) => {
   return firstPlayerUserId;
 };
 
-const buildGameMessage = (latestGame) => {
-  const ci = latestGame.CurrentIndex;
-  const currentOrder = latestGame.Orders[ci];
-  const currentUserDisplayName = Object.values(latestGame.UserId2DisplayNames[currentOrder])[0];
-  const currentUserId = Object.keys(latestGame.UserId2DisplayNames[currentOrder])[0];
-  const liffUrl = lineLib.buildLiffUrl(latestGame.BundleId, latestGame.GameId, currentUserId, ci);
-  console.log(liffUrl);
-  return liffUrl;
-  // return {
-  //   type: 'template',
-  //   // 文字回答版も用意
-  //   altText: `${currentUserDisplayName}さんにお絵かき伝言ゲームのお題が届いています`,
-  //   template: {
-  //     type: 'buttons',
-  //     imageAspectRatio: 'rectangle',
-  //     imageSize: 'contain',
-  //     // 文字回答版も用意
-  //     title: 'お絵かき',
-  //     // 文字回答版も用意
-  //     text: `${currentUserDisplayName}さんにお絵かき伝言ゲームのお題が届いています。クリックしてから60秒以内に絵を描いてください。`,
-  //     actions: [
-  //       {
-  //         type: 'uri',
-  //         label: 'お絵かき開始',
-  //         uri: liffUrl,
-  //       },
-  //     ],
-  //   },
-  // };
+const buildGameMessage = (latestGame, nextIndex, payload) => {
+  const nextOrder = latestGame.Orders[nextIndex];
+  const userDisplayName = Object.values(latestGame.UserId2DisplayNames[nextOrder])[0];
+  const nextUserId = Object.keys(latestGame.UserId2DisplayNames[nextOrder])[0];
+  const liffUrl = lineLib.buildLiffUrl(latestGame.BundleId, latestGame.GameId, nextUserId, nextIndex, payload);
+  // NOTE: text最大文字数に注意（titleまたは画像ありの場合60文字、両方なしの場合160文字）
+  // https://developers.line.biz/ja/reference/messaging-api/#template-messages
+  const qT = questionType(nextIndex);
+  let altText;
+  let text;
+  if (qT === 'drawing') {
+    altText = `${userDisplayName}さんにお絵かき伝言ゲームのお題が届いています`;
+    text = `${userDisplayName}さんにお絵かき伝言ゲームのお題が届いています。クリックしてから60秒以内に絵を描いてください。`;
+  } else if (qT === 'guessing') {
+    altText = `${userDisplayName}さんは絵を見て推測してください`;
+    text = `${userDisplayName}さんは絵を見て推測してください`;
+  }
+  return {
+    type: 'template',
+    altText,
+    template: {
+      type: 'buttons',
+      imageAspectRatio: 'rectangle',
+      imageSize: 'contain',
+      text,
+      actions: [
+        {
+          type: 'uri',
+          label: 'お絵かき開始',
+          uri: liffUrl,
+        },
+      ],
+    },
+  };
 };
 
 const buildFirstPublicMessage = (latestGame, opts) => {

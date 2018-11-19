@@ -72,21 +72,23 @@ module.exports.sendNext = async (event, context, callback) => {
       } else {
         const s3Object = await s3Lib.getObject(bundleId, latestGame.GameId, nextIndex - 1, currentUserId);
         const theme = s3Object.Body.toString();
-        privateMessage = `${currentUserDisplayName}さんから回ってきたお題は「${theme}」です。\n以下のURLをクリックして60秒以内に絵を描いてください。\n${lineLib.buildLiffUrl(bundleId, latestGame.GameId, nextUserId, nextIndex)}`;
-        publicMessage = `${currentUserDisplayName}さんが回答しました。${nextUserDisplayName}さんはお題に沿って絵を描いてください。`;
+        // privateMessage = `${currentUserDisplayName}さんから回ってきたお題は「${theme}」です。\n以下のURLをクリックして60秒以内に絵を描いてください。\n${lineLib.buildLiffUrl(bundleId, latestGame.GameId, nextUserId, nextIndex)}`;
+        // publicMessage = `${currentUserDisplayName}さんが回答しました。${nextUserDisplayName}さんはお題に沿って絵を描いてください。`;
+        publicMessage = util.buildGameMessage(latestGame, nextIndex, theme);
       }
     } else if (util.questionType(nextIndex) === 'guessing') {
       const imageUrl = s3Lib.buildObjectUrl(bundleId, latestGame.GameId, nextIndex - 1, currentUserId);
+      publicMessage = util.buildGameMessage(latestGame, nextIndex, imageUrl);
       console.log('imageUrl', imageUrl);
-      privateMessage = [
-        `${currentUserDisplayName}さんが描いた絵はこちらです。何の絵に見えますか？`,
-        {
-          type: 'image',
-          originalContentUrl: imageUrl,
-          previewImageUrl: imageUrl,
-        },
-      ];
-      publicMessage = `${currentUserDisplayName}さんが絵を描き終わりました。${nextUserDisplayName}さんは絵を見て予想してください`;
+      // privateMessage = [
+      //   `${currentUserDisplayName}さんが描いた絵はこちらです。何の絵に見えますか？`,
+      //   {
+      //     type: 'image',
+      //     originalContentUrl: imageUrl,
+      //     previewImageUrl: imageUrl,
+      //   },
+      // ];
+      // publicMessage = `${currentUserDisplayName}さんが絵を描き終わりました。${nextUserDisplayName}さんは絵を見て予想してください`;
     }
     // 2. firestoreの情報をupdate
     await firestore.updateGame(bundleId, { CurrentIndex: nextIndex });

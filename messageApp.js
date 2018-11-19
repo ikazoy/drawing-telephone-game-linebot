@@ -1,11 +1,14 @@
-const createError = require('http-errors');
 const express = require('express');
+const JSON = require('circular-json');
+
 const line = require('@line/bot-sdk');
 const _ = require('underscore');
+const createError = require('http-errors');
 const s3Lib = require('./libs/s3');
 const util = require('./libs/util');
 const lambda = require('./libs/lambda');
 const firestore = require('./libs/firestore');
+
 const lineLib = require('./libs/line');
 const quickReply = require('./libs/line/quickReply');
 
@@ -225,11 +228,12 @@ async function handleText(message, replyToken, source) {
       };
       await firestore.updateGame(bundleId, param);
       const updatedLatestGame = Object.assign(latestGame, param);
-      const publicMessage = util.buildGameMessage(updatedLatestGame);
-      // const privateMessage = util.buildFirstPrivateMessage(updatedLatestGame);
-      // lineLib.pushMessage(util.firstUserId(updatedLatestGame), privateMessage);
+      const publicMessage = util.buildGameMessage(updatedLatestGame, 0);
+      // const publicMessage = util.buildFirstPrivateMessage(updatedLatestGame);
       console.log('publicMessage', publicMessage);
-      return lineLib.replyText(replyToken, publicMessage);
+      lineLib.pushMessage(util.firstUserId(updatedLatestGame), [publicMessage]);
+      return lineLib.replyText(replyToken, [publicMessage]);
+      // return lineLib.pushMessage(bundleId, publicMessage);
     }
   }
   if (source.type === 'user') {
@@ -406,7 +410,7 @@ app.post('/webhook', line.middleware(lineLib.config), (req, res) => {
     })
     .catch((error) => {
       // 異常終了があれば、HTTP STATUS CODE 500を返す
-      console.log('Error!: ', error);
+      console.log('Error!: ', JSON.stringify(error));
       return res.status(500).json({});
     });
 });

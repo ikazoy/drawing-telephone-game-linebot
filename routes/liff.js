@@ -25,6 +25,13 @@ function decodeBase64Image(dataString) {
 router.get('/liff', (req, res, next) => {
   res.render('index', { title: 'Express' });
 });
+// 入力パラメータ
+// bundleId, GameId, nextIndex
+// 出力
+// JSON (message object for LINE)
+router.get('/nextMessage', (req, res, next) => {
+
+});
 
 router.post('/saveimage', async (req, res, text) => {
   const { image } = req.body;

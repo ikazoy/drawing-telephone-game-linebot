@@ -137,6 +137,13 @@ functions:
           path: /saveimage
           method: post
           cors: true
+  nextMessage:
+    handler: liffIndex.handler
+    events:
+      - http:
+          path: /nextmessage
+          method: get
+          cors: true
   sendNext:
     handler: handler.sendNext
   triggeredBySavedImage:

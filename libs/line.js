@@ -70,7 +70,10 @@ const getMemberProfile = async (memberId, bundleId, type) => {
   }
   return profile;
 };
-const buildLiffUrl = (bundleId, gameId, userId, currentIndex) => {
+// payload:
+//     1. URL of saved image
+//     2. answer itself
+const buildLiffUrl = (bundleId, gameId, userId, currentIndex, payload) => {
   const liffUrl = process.env.LIFF_URL;
   const params = {};
   if (bundleId != null) {
@@ -84,6 +87,10 @@ const buildLiffUrl = (bundleId, gameId, userId, currentIndex) => {
   }
   if (currentIndex != null) {
     params.currentIndex = currentIndex;
+  }
+  if (payload != null) {
+    // TODO: encrypt the string somwhow
+    params.payload = 'encrypted';
   }
   return `${liffUrl}${serialize(params)}`;
 };
