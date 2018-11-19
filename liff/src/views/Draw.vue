@@ -15,7 +15,6 @@ import "bootstrap/dist/css/bootstrap.css";
 import "bootstrap-vue/dist/bootstrap-vue.css";
 import Loading from "vue-loading-overlay";
 import "vue-loading-overlay/dist/vue-loading.css";
-import firestore from "../../../libs/firestore";
 
 // @ is an alias to /src
 // import HelloWorld from "@/components/HelloWorld.vue";
@@ -26,24 +25,60 @@ export default {
     return {
       leftSec: 60,
       isWarning: 20,
-      isLoading: false
+      isLoading: false,
+      userId: null,
+      bundleId: null
     };
   },
   components: {
     Loading
   },
   async beforeRouteEnter(to, from, next) {
-    console.log("before");
     const params = new URL(document.location).searchParams;
-    const bundleId =
+    const bundleIdInParams =
       params != null && params.has("bundleId") ? params.get("bundleId") : null;
-    const profile = liff.getProfile();
-    console.log(profile);
-    const can = await firestore.canOpenDrawScreen(bundleId, profile.userId);
-    if (can) {
-      next();
-    }
-    next("/");
+    const userIdInParams =
+      params != null && params.has("userId") ? params.get("userId") : null;
+    alert("here");
+    liff.init(
+      function(data) {
+        alert(JSON.stringify(data));
+        // console.log(JSON.stringify(data));
+        // Now you can call LIFF API
+        this.userId = data.context.userId;
+        this.bundleId =
+          data.context.type === "room"
+            ? data.context.roomId
+            : data.context.type === "group"
+              ? data.context.groupId
+              : null;
+        alert(this.userId);
+        alert(this.bundleId);
+        alert(bundleIdInParams);
+        if (
+          bundleIdInParams === this.bundleId &&
+          userIdInParams === this.userId
+        ) {
+          console.log("matched");
+          next();
+        } else {
+          console.log("no matched");
+          next("/");
+        }
+
+        // if (can) {
+        //   next();
+        // }
+      },
+      err => {
+        // LIFF initialization failed
+        // console.log(err);
+        alert(err);
+        next("/");
+      }
+    );
+    // alert("outside");
+    // next("");
     // .catch(function(error) {
     //   window.alert("Error getting profile: " + error.message);
     // });

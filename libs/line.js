@@ -88,6 +88,8 @@ const buildLiffUrl = (bundleId, gameId, userId, currentIndex) => {
   return `${liffUrl}${serialize(params)}`;
 };
 
+const buildDrawLiffUrl = (bundleId, gameId, userId, currentIndex) => `${buildLiffUrl(bundleId, gameId, userId, currentIndex)}/#/draw`;
+
 
 module.exports = {
   config,
@@ -96,4 +98,5 @@ module.exports = {
   pushMessage,
   getMemberProfile,
   buildLiffUrl,
+  buildDrawLiffUrl,
 };

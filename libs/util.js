@@ -12,6 +12,38 @@ const firstUserDisplayName = (latestGame) => {
   const [firstPlayerUserId] = Object.values(latestGame.UserId2DisplayNames[latestGame.Orders[0]]);
   return firstPlayerUserId;
 };
+
+const buildGameMessage = (latestGame) => {
+  const ci = latestGame.CurrentIndex;
+  const currentOrder = latestGame.Orders[ci];
+  const currentUserDisplayName = Object.values(latestGame.UserId2DisplayNames[currentOrder])[0];
+  const currentUserId = Object.keys(latestGame.UserId2DisplayNames[currentOrder])[0];
+  const liffUrl = lineLib.buildLiffUrl(latestGame.BundleId, latestGame.GameId, currentUserId, ci);
+  console.log(liffUrl);
+  return liffUrl;
+  // return {
+  //   type: 'template',
+  //   // 文字回答版も用意
+  //   altText: `${currentUserDisplayName}さんにお絵かき伝言ゲームのお題が届いています`,
+  //   template: {
+  //     type: 'buttons',
+  //     imageAspectRatio: 'rectangle',
+  //     imageSize: 'contain',
+  //     // 文字回答版も用意
+  //     title: 'お絵かき',
+  //     // 文字回答版も用意
+  //     text: `${currentUserDisplayName}さんにお絵かき伝言ゲームのお題が届いています。クリックしてから60秒以内に絵を描いてください。`,
+  //     actions: [
+  //       {
+  //         type: 'uri',
+  //         label: 'お絵かき開始',
+  //         uri: liffUrl,
+  //       },
+  //     ],
+  //   },
+  // };
+};
+
 const buildFirstPublicMessage = (latestGame, opts) => {
   // 順番をユーザー名順に
   const orderedPlayers = latestGame.Orders.map(o => Object.values(latestGame.UserId2DisplayNames[o])[0]);
@@ -72,6 +104,7 @@ module.exports = {
   firstUserDisplayName,
   buildFirstPublicMessage,
   buildFirstPrivateMessage,
+  buildGameMessage,
   canChangeTheme,
   pickTheme,
 };

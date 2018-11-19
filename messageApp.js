@@ -225,9 +225,10 @@ async function handleText(message, replyToken, source) {
       };
       await firestore.updateGame(bundleId, param);
       const updatedLatestGame = Object.assign(latestGame, param);
-      const publicMessage = util.buildFirstPublicMessage(updatedLatestGame);
-      const privateMessage = util.buildFirstPrivateMessage(updatedLatestGame);
-      lineLib.pushMessage(util.firstUserId(updatedLatestGame), privateMessage);
+      const publicMessage = util.buildGameMessage(updatedLatestGame);
+      // const privateMessage = util.buildFirstPrivateMessage(updatedLatestGame);
+      // lineLib.pushMessage(util.firstUserId(updatedLatestGame), privateMessage);
+      console.log('publicMessage', publicMessage);
       return lineLib.replyText(replyToken, publicMessage);
     }
   }
