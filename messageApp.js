@@ -220,20 +220,21 @@ async function handleText(message, replyToken, source) {
       }
       // 順番、お題を決定（範囲を作成、シャッフル)
       const orders = _.shuffle(Array.from(Array(playersNum).keys()));
+      const theme = util.pickTheme();
       // 保存
       const param = {
         Orders: orders,
         CurrentIndex: 0,
-        Theme: util.pickTheme(),
+        Theme: theme,
       };
+      console.log('param', param);
       await firestore.updateGame(bundleId, param);
+      console.log('bbbb');
       const updatedLatestGame = Object.assign(latestGame, param);
-      const publicMessage = util.buildGameMessage(updatedLatestGame, 0);
-      // const publicMessage = util.buildFirstPrivateMessage(updatedLatestGame);
+      console.log('aaaaa');
+      const publicMessage = util.buildGameMessage(updatedLatestGame, 0, theme);
       console.log('publicMessage', publicMessage);
-      lineLib.pushMessage(util.firstUserId(updatedLatestGame), [publicMessage]);
       return lineLib.replyText(replyToken, [publicMessage]);
-      // return lineLib.pushMessage(bundleId, publicMessage);
     }
   }
   if (source.type === 'user') {

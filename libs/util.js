@@ -1,6 +1,9 @@
 const _ = require('underscore');
 const lineLib = require('./line');
+const firestore = require('./firestore');
 const themes = require('./themes');
+const s3Lib = require('./s3');
+const quickReply = require('./line/quickReply');
 
 const questionType = targetIndex => ((targetIndex % 2 === 0) ? 'drawing' : 'guessing');
 const fileSuffix = targetIndex => ((targetIndex % 2 === 0) ? 'jpeg' : 'txt');
@@ -102,6 +105,77 @@ const canChangeTheme = (userId, latestGame) => {
 };
 const pickTheme = () => themes[_.random(0, themes.length - 1)];
 
+const sendNext = async (bundleId, nextIndex) => {
+  console.log('bundleId', bundleId);
+  console.log('process', process.env);
+  const latestGame = await firestore.latestGame(bundleId);
+  let nextUserId;
+  let publicMessage;
+  // nextIndex = 0 is a special case: the first user is skipped by the command
+  if (nextIndex === 0) {
+    publicMessage = buildFirstPublicMessage(latestGame);
+    await firestore.putLatestBundleId(nextUserId, bundleId);
+    return {
+      publicMessage,
+    };
+  }
+  const currentUserIndex = latestGame.Orders[nextIndex - 1];
+  const currentUserId = latestGame.UsersIds[currentUserIndex];
+  const currentUserDisplayName = (currentUserIndex >= 0) ? Object.values(latestGame.UserId2DisplayNames[currentUserIndex])[0] : '';
+  if (latestGame.CurrentIndex + 1 >= latestGame.UsersIds.length) {
+    // 人数分終了
+    await firestore.updateGame(bundleId, { Status: 'done' });
+    if (questionType(nextIndex) === 'drawing') {
+      publicMessage = {
+        type: 'text',
+        text: `${currentUserDisplayName}さんが回答しました。以上でゲームは終了です。結果発表を見る場合は「結果発表」と送信してください。`,
+        quickReply: {
+          items: [quickReply.announce],
+        },
+      };
+    } else if (questionType(nextIndex) === 'guessing') {
+      publicMessage = {
+        type: 'text',
+        text: `${currentUserDisplayName}さんが絵を描き終わりました。以上でゲームは終了です。結果発表を見る場合は「結果発表」と送信してください。`,
+        quickReply: {
+          items: [quickReply.announce],
+        },
+      };
+    }
+  } else {
+    // 1. 次の順番のユーザーにメッセージを送る
+    const nextUserIndex = latestGame.Orders[nextIndex];
+    nextUserId = latestGame.UsersIds[nextUserIndex];
+    const nextUserDisplayName = Object.values(latestGame.UserId2DisplayNames[nextUserIndex])[0];
+    if (questionType(nextIndex) === 'drawing') {
+      const s3Object = await s3Lib.getObject(bundleId, latestGame.GameId, nextIndex - 1, currentUserId);
+      const theme = s3Object.Body.toString();
+      // privateMessage = `${currentUserDisplayName}さんから回ってきたお題は「${theme}」です。\n以下のURLをクリックして60秒以内に絵を描いてください。\n${lineLib.buildLiffUrl(bundleId, latestGame.GameId, nextUserId, nextIndex)}`;
+      // publicMessage = `${currentUserDisplayName}さんが回答しました。${nextUserDisplayName}さんはお題に沿って絵を描いてください。`;
+      publicMessage = buildGameMessage(latestGame, nextIndex, theme);
+    } else if (questionType(nextIndex) === 'guessing') {
+      const imageUrl = s3Lib.buildObjectUrl(bundleId, latestGame.GameId, nextIndex - 1, currentUserId);
+      publicMessage = buildGameMessage(latestGame, nextIndex, imageUrl);
+      console.log('imageUrl', imageUrl);
+      // privateMessage = [
+      //   `${currentUserDisplayName}さんが描いた絵はこちらです。何の絵に見えますか？`,
+      //   {
+      //     type: 'image',
+      //     originalContentUrl: imageUrl,
+      //     previewImageUrl: imageUrl,
+      //   },
+      // ];
+      // publicMessage = `${currentUserDisplayName}さんが絵を描き終わりました。${nextUserDisplayName}さんは絵を見て予想してください`;
+    }
+    // 2. firestoreの情報をupdate
+    await firestore.updateGame(bundleId, { CurrentIndex: nextIndex });
+    await firestore.putLatestBundleId(nextUserId, bundleId);
+  }
+  return {
+    publicMessage,
+  };
+};
+
 module.exports = {
   questionType,
   fileSuffix,
@@ -112,4 +186,5 @@ module.exports = {
   buildGameMessage,
   canChangeTheme,
   pickTheme,
+  sendNext,
 };

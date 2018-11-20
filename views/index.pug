@@ -36,6 +36,7 @@ html(lang="ja")
 
 body
   //- TODO: one time token
+  #theme
   .container
     canvas#canvas
     button#btn.btn.btn-primary.btn-block(type="button") 送信
@@ -126,7 +127,6 @@ body
               dom.classList.add('warning');
             }
             if (left == 0) {
-            //- if (left <= 0) {
               callback();
             }
         }, interval);

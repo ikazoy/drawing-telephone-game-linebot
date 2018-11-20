@@ -1,6 +1,5 @@
 require('dotenv').config();
 const firestore = require('./libs/firestore');
-const lineLib = require('./libs/line');
 const s3Lib = require('./libs/s3');
 const util = require('./libs/util');
 const lambda = require('./libs/lambda');
@@ -32,13 +31,16 @@ module.exports.triggeredBySavedImage = async (event, context, callback) => {
 // yarn run sls invoke local --function sendNext -p sendNext-event.json
 module.exports.sendNext = async (event, context, callback) => {
   const { bundleId, nextIndex } = event;
+  console.log('event', event);
+  console.log('bundleId', bundleId);
+  console.log('process', process.env);
   const latestGame = await firestore.latestGame(bundleId);
+  console.log('latestGame', latestGame);
   const currentUserIndex = latestGame.Orders[nextIndex - 1];
   const currentUserId = latestGame.UsersIds[currentUserIndex];
   const currentUserDisplayName = (currentUserIndex >= 0) ? Object.values(latestGame.UserId2DisplayNames[currentUserIndex])[0] : '';
   let nextUserId;
   let publicMessage;
-  let privateMessage;
   // nextIndex = 0 is a special case: the first user is skipped by the command
   if (latestGame.CurrentIndex + 1 >= latestGame.UsersIds.length && nextIndex !== 0) {
     // 人数分終了
@@ -68,7 +70,7 @@ module.exports.sendNext = async (event, context, callback) => {
     if (util.questionType(nextIndex) === 'drawing') {
       if (nextIndex === 0) {
         publicMessage = util.buildFirstPublicMessage(latestGame);
-        privateMessage = util.buildFirstPrivateMessage(latestGame);
+        // privateMessage = util.buildFirstPrivateMessage(latestGame);
       } else {
         const s3Object = await s3Lib.getObject(bundleId, latestGame.GameId, nextIndex - 1, currentUserId);
         const theme = s3Object.Body.toString();
@@ -94,17 +96,14 @@ module.exports.sendNext = async (event, context, callback) => {
     await firestore.updateGame(bundleId, { CurrentIndex: nextIndex });
     await firestore.putLatestBundleId(nextUserId, bundleId);
   }
-  if (publicMessage !== null) {
-    lineLib.pushMessage(bundleId, publicMessage);
-  }
-  if (privateMessage !== null) {
-    lineLib.pushMessage(nextUserId, privateMessage);
-  }
+  const resJSON = {
+    msg: 'succces',
+    publicMessage,
+  };
 
   const response = {
     statusCode: 200,
-    // body: JSON.parse(data.Payload)
-    body: '{"msg": "success"}',
+    body: JSON.stringify(resJSON),
   };
   callback(null, response);
 };

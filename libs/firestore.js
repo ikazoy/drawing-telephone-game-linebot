@@ -1,4 +1,5 @@
-const dynamodb = require('serverless-dynamodb-client');
+const dynExp = require('@aws/dynamodb-expressions');
+
 const AWS = require('aws-sdk');
 const dynamodbUpdateExpression = require('dynamodb-update-expression');
 const util = require('./util');
@@ -25,7 +26,8 @@ const latestGame = async (bundleId) => {
       return result.Item;
     }
   } catch (err) {
-    console.error(err);
+    console.error('error on latestGame', err);
+    console.error('params', params);
   }
   return null;
 };
@@ -133,16 +135,33 @@ const putLatestBundleId = async (userId, bundleId) => {
 const updateGame = async (bundleId, updateValues) => {
   // https://stackoverflow.com/questions/43791700/whats-the-simplest-way-to-copy-an-item-from-a-dynamodb-stream-to-another-table
   // https://www.npmjs.com/package/dynamodb-data-types
-  const updateExpression = dynamodbUpdateExpression.getUpdateExpression({}, updateValues);
-  const params = Object.assign({
+  console.log('updateGame start', updateValues);
+  let updateExpression;
+  // const original = {};
+  // const modified = updateValues;
+  const expr = new dynExp.UpdateExpression();
+  const attributes = new dynExp.ExpressionAttributes();
+
+  // eslint-disable-next-line
+  for (const [key, value] of Object.entries(updateValues)) {
+    console.log(`${key} ${value}`);
+    expr.set(key, value);
+  }
+  console.log('updateExpression', updateExpression);
+  const params = {
     TableName: process.env.GAMES_DYNAMODB_TABLE,
     Key: {
       BundleId: bundleId,
     },
-  }, updateExpression);
+    UpdateExpression: expr.serialize(attributes),
+    ExpressionAttributeNames: attributes.names,
+    ExpressionAttributeValues: attributes.values,
+  };
   let res;
+  console.log('updateGame', params);
   try {
     res = await docClient.update(params).promise();
+    console.log('updateGame res', res);
   } catch (err) {
     console.log('ERROR', err);
   }
@@ -199,6 +218,7 @@ const skipCurrentUser = async (bundleId) => {
     UsersIds: lg.UsersIds,
     UserId2DisplayNames: lg.UserId2DisplayNames,
   };
+  // TODO: replace this with 'aws-labs' module as updateGame method
   const updateExpression = dynamodbUpdateExpression.getUpdateExpression({}, updateValues);
   const params = Object.assign({
     TableName: process.env.GAMES_DYNAMODB_TABLE,
@@ -229,6 +249,7 @@ const swapTheme = async (game) => {
     Theme: newTheme,
     ThemeUpdatedTimes: prevTimes + 1,
   };
+  // TODO: replace this with 'aws-labs' module as updateGame method
   const updateExpression = dynamodbUpdateExpression.getUpdateExpression({}, updateValues);
   const params = Object.assign({
     TableName: process.env.GAMES_DYNAMODB_TABLE,

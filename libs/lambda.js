@@ -21,7 +21,7 @@ const invokeSendNext = async (bundleId, nextIndex) => {
       err,
     };
   }
-  return 1;
+  return res;
 };
 
 module.exports = {

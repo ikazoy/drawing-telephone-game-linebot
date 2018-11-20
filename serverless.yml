@@ -94,14 +94,23 @@ resources:
         TableName: ${self:provider.environment.USERS_DYNAMODB_TABLE}
 
 plugins:
+  - serverless-webpack
   - serverless-finch
-  - serverless-dynamodb-local
+  # - serverless-dynamodb-local
   - serverless-offline
 
 custom:
   client:
     bucketName: drawing-telephone-game-liff-static-${opt:stage, self:provider.stage}
     distributionFolder: liff/dist
+  webpack:
+    packager: 'yarn'      # Defaults to npm
+    packagerOptions: {}   # Optional, depending on the selected packager
+    mode: ${opt:stage, self:provider.stage}
+    includeModules:
+      forceExclude:
+        - aws-sdk
+        - dynamo-update-expression
 #   dynamodb:
 #   # If you only want to use DynamoDB Local in some stages, declare them here
 #     stages:
@@ -111,9 +120,10 @@ custom:
 #       migrate: true
 
 # デプロイ時のパッケージの内容について
-# package:
-#   include:
-#     - src/**
+package:
+  exclude:
+    - liff/**
+#   individually: true
 
 functions:
   webhook:

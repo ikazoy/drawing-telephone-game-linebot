@@ -1,5 +1,8 @@
 const express = require('express');
 const s3Lib = require('../libs/s3');
+const util = require('../libs/util');
+const firestore = require('../libs/firestore');
+const lambda = require('../libs/lambda');
 
 const { s3 } = s3Lib;
 
@@ -29,8 +32,23 @@ router.get('/liff', (req, res, next) => {
 // bundleId, GameId, nextIndex
 // 出力
 // JSON (message object for LINE)
-router.get('/nextMessage', (req, res, next) => {
-
+router.get('/nextMessage', async (req, res, next) => {
+  // TODO: validate params
+  const { bundleId, nextIndex } = req.query;
+  const result = await util.sendNext(bundleId, nextIndex);
+  let response;
+  console.log('result', result);
+  if (result != null) {
+    response = res.json({
+      success: true,
+      publicMessage: result.publicMessage,
+    });
+  } else {
+    response = res.json({
+      error: true,
+    });
+  }
+  return response;
 });
 
 router.post('/saveimage', async (req, res, text) => {
