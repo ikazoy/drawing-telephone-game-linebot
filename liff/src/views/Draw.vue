@@ -1,13 +1,23 @@
-<template lang="pug">
-  div
-    loading(:active.sync="isLoading",can-cancel=false, is-full-page=true)
-    VueSignaturePad(width="500px", height="500px", ref ="signaturePad")
-    div
-      button.btn.btn-primary(type="button", @click="saveImage") 送信
-      .divider
-      button.btn.btn-primary(type="button", @click="undo") 一つ戻る
-      span.countdown-timer 残り時間
-        span.blink(:class="{warning:warned}") {{ leftSec }}
+<template>
+  <div>
+    <loading :active.sync="isLoading" :can-cancel="canCancel" :is-full-page="isFullPage">
+    </loading>
+    <div>
+      {{ payload }}
+    </div>
+    <VueSignaturePad width="100%" :height="height" ref="signaturePad" :options="options" saveType="image/jpeg" />
+    <div>
+      <button class="btn btn-primary" type="button" @click="saveImage">送信</button>
+      <div class="divider" />
+      <button class="btn btn-primary" type="button" @click="undo">戻る</button>
+      <span class="countdown-timer">
+        残り時間
+      </span>
+      <span class="blink" :class="{warning:warned}">
+        {{ leftSec }}
+      </span>
+    </div>
+  </div>
 </template>
 
 <script>
@@ -23,11 +33,18 @@ export default {
   name: "home",
   data: function() {
     return {
+      payload: "",
       leftSec: 60,
       isWarning: 20,
       isLoading: false,
       userId: null,
-      bundleId: null
+      bundleId: null,
+      canCancel: false,
+      isFullPage: true,
+      height: `${window.innerHeight - 50}px`,
+      options: {
+        backgroundColor: "rgb(232,232,232)"
+      }
     };
   },
   components: {
@@ -52,9 +69,6 @@ export default {
             : data.context.type === "group"
               ? data.context.groupId
               : null;
-        alert(this.userId);
-        alert(this.bundleId);
-        alert(bundleIdInParams);
         if (
           bundleIdInParams === this.bundleId &&
           userIdInParams === this.userId
@@ -89,13 +103,15 @@ export default {
     }
   },
   mounted: function() {
+    const query = this.$route.query;
+    this.payload = query.payload;
     this.startTimer();
   },
   methods: {
     undo() {
       this.$refs.signaturePad.undoSignature();
     },
-    saveImage() {
+    async saveImage() {
       this.isLoading = true;
       const params = new URL(document.location).searchParams;
       const bundleId =
@@ -112,55 +128,55 @@ export default {
           : null;
       const { isEmpty, data } = this.$refs.signaturePad.saveSignature();
       if (isEmpty) {
-        alert("empty image");
+        alert("なにか書いてください");
+        this.isLoading = false;
         return;
       }
-      this.axios
-        .post(`${process.env.API_BASE_URL}/saveimage`, {
+      const res = await this.axios.post(
+        `${process.env.API_BASE_URL}/saveimage`,
+        {
           image: data,
           bundleId,
           gameId,
           currentIndex,
           userId
-        })
-        .then(function(res) {
-          this.isLoading = false;
-          console.log("success", res);
-          const d = res.data;
-          if (!d.success) {
-            window.alert("request to /saveimage failed.");
-            window.alert(d.message);
-          }
-          if (userId != null) {
+        }
+      );
+      this.isLoading = false;
+      console.log("success", res);
+      const d = res.data;
+      if (!d.success) {
+        window.alert("request to /saveimage failed.");
+        window.alert(d.message);
+      }
+      if (userId != null) {
+        liff
+          .getProfile()
+          .then(function(profile) {
             liff
-              .getProfile()
-              .then(function(profile) {
-                liff
-                  .sendMessages([
-                    {
-                      type: "image",
-                      originalContentUrl: d.filePath,
-                      previewImageUrl: d.filePath
-                    }
-                  ])
-                  .then(function() {
-                    liff.closeWindow();
-                  })
-                  .catch(function(error) {
-                    window.alert("Error sending message: " + error.message);
-                  });
+              .sendMessages([
+                {
+                  type: "image",
+                  originalContentUrl: d.filePath,
+                  previewImageUrl: d.filePath
+                }
+              ])
+              .then(function() {
+                liff.closeWindow();
               })
               .catch(function(error) {
-                window.alert("Error getting profile: " + error.message);
+                window.alert("Error sending message: " + error.message);
               });
-          } else {
-            console.log("closing liff window");
-          }
-        })
-        .catch(function(error) {
-          this.isLoading = false;
-          console.log("error", error);
-        });
+          })
+          .catch(function(error) {
+            window.alert("Error getting profile: " + error.message);
+          });
+      } else {
+        console.log("closing liff window");
+      }
+      setTimeout(function() {
+        this.isLoading = false;
+      }, 10000);
     },
     // startTimer(duration, display, callback) {
     startTimer() {

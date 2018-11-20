@@ -90,7 +90,7 @@ const buildLiffUrl = (bundleId, gameId, userId, currentIndex, payload) => {
   }
   if (payload != null) {
     // TODO: encrypt the string somwhow
-    params.payload = 'encrypted';
+    params.payload = payload;
   }
   return `${liffUrl}${serialize(params)}`;
 };

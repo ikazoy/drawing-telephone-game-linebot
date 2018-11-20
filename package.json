@@ -21,7 +21,7 @@
     "circular-json": "^0.5.9",
     "compression": "^1.7.2",
     "cookie-parser": "~1.4.3",
-    "cors": "^2.8.4",
+    "cors": "^2.8.5",
     "debug": "~2.6.9",
     "dotenv": "^6.1.0",
     "dynamodb-update-expression": "^0.1.21",
@@ -39,12 +39,14 @@
   "devDependencies": {
     "@babel/plugin-proposal-class-properties": "^7.1.0",
     "@babel/plugin-proposal-decorators": "^7.1.6",
+    "dotenv-webpack": "^1.5.7",
     "eslint": "^5.1.0",
     "eslint-config-airbnb": "^17.0.0",
     "eslint-plugin-import": "^2.13.0",
     "serverless": "^1.28.0",
     "serverless-offline": "^3.25.6",
     "serverless-webpack": "^5.2.0",
-    "webpack": "^4.26.0"
+    "webpack": "^4.26.0",
+    "webpack-node-externals": "^1.7.2"
   }
 }

@@ -1,8 +1,6 @@
 const express = require('express');
 const s3Lib = require('../libs/s3');
 const util = require('../libs/util');
-const firestore = require('../libs/firestore');
-const lambda = require('../libs/lambda');
 
 const { s3 } = s3Lib;
 
@@ -54,7 +52,6 @@ router.get('/nextMessage', async (req, res, next) => {
 router.post('/saveimage', async (req, res, text) => {
   const { image } = req.body;
   const imageBuffer = decodeBase64Image(image);
-  console.log('imageBuffer', imageBuffer);
   const params = {
     ContentType: imageBuffer.type,
     Body: imageBuffer.data,

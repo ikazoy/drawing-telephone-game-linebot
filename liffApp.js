@@ -1,5 +1,6 @@
 const createError = require('http-errors');
 const express = require('express');
+const cors = require('cors');
 const path = require('path');
 const bodyParser = require('body-parser');
 // const cookieParser = require('cookie-parser');
@@ -12,11 +13,11 @@ const indexRouter = require('./routes/liff');
 const app = express();
 
 // view engine setup
-app.set('views', path.join(__dirname, 'views'));
-app.set('view engine', 'pug');
+// app.set('views', path.join(__dirname, 'views'));
 
 // app.use(logger('dev'));
 app.use(express.json());
+app.use(cors());
 // app.use(express.urlencoded({ extended: false }));
 app.use(bodyParser.urlencoded({
   extended: true,
@@ -47,7 +48,10 @@ app.use((err, req, res, next) => {
 
   // render the error page
   res.status(err.status || 500);
-  res.render('error');
+  res.json({
+    message: err.message,
+    error: err,
+  });
 });
 
 module.exports = app;
