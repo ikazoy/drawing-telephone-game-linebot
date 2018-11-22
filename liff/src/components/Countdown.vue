@@ -1,5 +1,5 @@
 <template>
-  <span class="blink" :class="{ warning: warned }">{{ left }}</span>
+  <span class="blink" :class="{ warning: warned }">00:{{ left }}</span>
 </template>
 
 <script>

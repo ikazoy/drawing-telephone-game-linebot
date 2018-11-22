@@ -36,8 +36,7 @@ async function handleText(message, replyToken, source) {
 ⏭次へ：次のプレイヤー分の結果発表に移ります。（ゲーム終了後の結果発表中のみ有効）
 🆘ヘルプ：コマンド一覧を確認できます。
 
-それぞれのコマンドはゲームの流れに合わせて表示されるボタンを押す、もしくは直接テキストメッセージを送信することで実行できます👌
-`;
+それぞれのコマンドはゲームの流れに合わせて表示されるボタンを押す、もしくは直接テキストメッセージを送信することで実行できます👌`;
     return lineLib.replyText(replyToken, helpText);
   }
 
@@ -90,7 +89,11 @@ async function handleText(message, replyToken, source) {
       return lineLib.replyText(replyToken,
         {
           type: 'text',
-          text: `参加を受け付けました。参加者が揃ったら「開始」と送信してください。\n(参加者は私と友達になっている必要があります)\n\n現在の参加者一覧\n${displayNames.join('\n')}`,
+          text: `参加を受け付けました🙆‍参加者が揃ったら「開始」と送信してください⏭
+(参加者は私と友達になっている必要があります)
+
+現在の参加者一覧👫
+${displayNames.join('\n')}`,
           quickReply: {
             items: [quickReply.participate, quickReply.start, quickReply.help],
           },
@@ -233,8 +236,8 @@ async function handleText(message, replyToken, source) {
       const updatedLatestGame = Object.assign(latestGame, param);
       console.log('aaaaa');
       const publicMessage = util.buildGameMessage(updatedLatestGame, 0, theme);
-      console.log('publicMessage', publicMessage);
-      return lineLib.replyText(replyToken, [publicMessage]);
+      console.log('publicMessage', JSON.stringify(publicMessage));
+      return lineLib.replyText(replyToken, publicMessage);
     }
   }
   if (source.type === 'user') {
@@ -325,10 +328,10 @@ async function handleFollow(replyToken) {
 }
 
 async function handleJoin(replyToken) {
-  const onJoinMessage = `ゲームに参加したい人は「参加」と送信してください。
-参加者が揃ったら「開始」と送信してください。
-万が一ゲームを途中で終了したい、やり直したい場合「終了」と送信してください。
-詳しい使い方を見るには「ヘルプ」と送信してください。`;
+  const onJoinMessage = `ゲームに参加したい人は「参加」と送信してください🙌
+参加者が揃ったら「開始」と送信してください⏭
+万が一ゲームを途中で終了したい、やり直したい場合「終了」と送信してください⛔️
+詳しい使い方を見るには「ヘルプ」と送信してください🆘`;
   return lineLib.replyText(replyToken,
     {
       type: 'text',

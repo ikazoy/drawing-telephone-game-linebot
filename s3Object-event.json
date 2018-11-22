@@ -27,7 +27,7 @@
                     "arn": "arn:aws:s3:::drawing-telephone-game-linebot-images"
                 },
                 "object": {
-                    "key": "R0424f09e0bd8f1fc7c7e99d260933373/0-Uceb4ceddcf7c2f2a508aa245469320e9.jpeg",
+                    "key": "R0424f09e0bd8f1fc7c7e99d260933373/0-Uceb4ceddcf7c2f2a508aa245469320e9.png",
                     "size": 14074,
                     "eTag": "b14c52f400933750362131ea55ceecc0",
                     "sequencer": "005BBCA514F8F98DBB"

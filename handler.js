@@ -9,7 +9,7 @@ const quickReply = require('./libs/line/quickReply');
 module.exports.triggeredBySavedImage = async (event, context, callback) => {
   const changedObject = event.Records[0].s3.object;
   // actual example of objectKey
-  // Rd4ae3efbe814c9219965368a7932d7a7/20181110T07%3A22%3A04.222Z/0-Uceb4ceddcf7c2f2a508aa245469320e9.jpeg
+  // Rd4ae3efbe814c9219965368a7932d7a7/20181110T07%3A22%3A04.222Z/0-Uceb4ceddcf7c2f2a508aa245469320e9.png
   const objectKey = changedObject.key;
   const regex = /(\w+)\/(.+)\/([0-9]+)-(\w+)\.(\w+)/;
   const regexResult = objectKey.match(regex);

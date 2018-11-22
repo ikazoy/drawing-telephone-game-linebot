@@ -22,18 +22,24 @@ const router = new Router({
         import(/* webpackChunkName: "about" */ "./views/About.vue")
     },
     {
+      path: "/unauthorized",
+      name: "unauthorized",
+      component: () =>
+        import(/* webpackChunkName: "about" */ "./views/Unauthorized.vue")
+    },
+    {
       path: "/liff",
       beforeEnter: (to, from, next) => {
         // try {
-        console.log("to", to.query);
         const params = to.query;
         const bundleIdInParams =
           params != null && params.bundleId ? params.bundleId : null;
         const userIdInParams =
           params != null && params.userId ? params.userId : null;
+        console.log("beforeEnter");
         liff.init(
           function(data) {
-            alert(JSON.stringify(data));
+            // alert(JSON.stringify(data));
             // console.log(JSON.stringify(data));
             // Now you can call LIFF API
             const userId = data.context.userId;
@@ -44,8 +50,7 @@ const router = new Router({
                 ? data.context.groupId
                 : null;
             if (bundleIdInParams === bundleId && userIdInParams === userId) {
-              alert("matched");
-              const { currentIndex } = params.currentIndex;
+              const { currentIndex } = params;
               if (currentIndex % 2 === 0) {
                 next({
                   path: "/draw",
@@ -58,9 +63,9 @@ const router = new Router({
                 });
               }
             } else {
-              alert("no matched");
               // next("/");
-              next();
+              console.log("aaaa");
+              next("/unauthorized");
             }
           },
           err => {
@@ -68,7 +73,8 @@ const router = new Router({
             // console.log(err);
             // alert(err);
             // next("/");
-            next();
+            console.log("bbb");
+            next("/unauthorized");
           }
         );
         // } catch (err) {

@@ -1,4 +1,5 @@
 const express = require('express');
+const JSON = require('circular-json');
 const s3Lib = require('../libs/s3Util');
 const sendNext = require('../libs/sendNext');
 
@@ -15,8 +16,8 @@ function decodeBase64Image(dataString) {
   }
 
   response.type = matches[1];
-  if (matches[1] !== 'image/jpeg') {
-    console.error('image file is not jpeg format.');
+  if (matches[1] !== 'image/png') {
+    console.error('image file is not png format.');
   }
   response.data = Buffer.from(matches[2], 'base64');
 
@@ -33,9 +34,11 @@ router.get('/liff', (req, res, next) => {
 router.get('/nextmessage', async (req, res, next) => {
   // TODO: validate params
   const { bundleId, nextIndex } = req.query;
+  console.log('bundleId', bundleId);
+  console.log('nextIndex', nextIndex);
   const result = await sendNext.sendNext(bundleId, nextIndex);
   let response;
-  console.log('result', result);
+  console.log('result', JSON.stringify(result.publicMessage));
   if (result != null) {
     response = res.json({
       success: true,
@@ -51,6 +54,7 @@ router.get('/nextmessage', async (req, res, next) => {
 
 // TODO: change name of endpoint for more commoness
 router.post('/saveimage', async (req, res, next) => {
+  console.log('lets save image');
   let params;
   // save image
   if (req.body.image) {

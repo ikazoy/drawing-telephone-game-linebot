@@ -3,7 +3,7 @@ const lineLib = require('./line');
 const themes = require('./themes');
 
 const questionType = targetIndex => ((targetIndex % 2 === 0) ? 'drawing' : 'guessing');
-const fileSuffix = targetIndex => ((targetIndex % 2 === 0) ? 'jpeg' : 'txt');
+const fileSuffix = targetIndex => ((targetIndex % 2 === 0) ? 'png' : 'txt');
 const firstUserId = (latestGame) => {
   const [firstPlayerUserId] = Object.keys(latestGame.UserId2DisplayNames[latestGame.Orders[0]]);
   return firstPlayerUserId;
@@ -31,7 +31,13 @@ const buildGameMessage = (latestGame, nextIndex, payload) => {
     altText = `${userDisplayName}さんは絵を見て推測してください`;
     text = `${userDisplayName}さんは絵を見て推測してください`;
   }
-  return {
+  const messages = [];
+  if (nextIndex === 0) {
+    // 順番をユーザー名順に
+    const orderedPlayers = latestGame.Orders.map(o => Object.values(latestGame.UserId2DisplayNames[o])[0]);
+    messages.push(`ゲームを開始します⏭\n\n順番はこちらです👥\n${orderedPlayers.join('\n')}`);
+  }
+  messages.push({
     type: 'template',
     altText,
     template: {
@@ -47,7 +53,8 @@ const buildGameMessage = (latestGame, nextIndex, payload) => {
         },
       ],
     },
-  };
+  });
+  return messages;
 };
 
 const buildFirstPublicMessage = (latestGame, opts) => {

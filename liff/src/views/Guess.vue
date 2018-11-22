@@ -3,16 +3,16 @@
     <loading :active.sync="isLoading" :can-cancel="canCancel" :is-full-page="isFullPage">
     </loading>
     <picture>
-      <source :srcset="payload" />
-      <img :src="payload" />
+      <source class="drawing" :srcset="payload" />
+      <img class="drawing" :src="payload" />
     </picture>
-    <div>
-      <input v-model="answer" type="text" placeholder="答えを入力してください" />
-      <button class="btn btn-primary" type="button" @click="saveAnswer">送信</button>
-      <div class="countdown-timer">
-        残り時間
-        <Countdown @timeuped.once="timeup" :initialLeft="30" />
-      </div>
+    <div class="centerize-column-container">
+      <input class="answer-input" v-model="answer" type="text" placeholder="答えを入力してください" />
+      <button class="btn btn-primary medium-button" type="button" @click="saveAnswer">送信</button>
+    </div>
+    <div class="countdown-timer">
+      残り時間
+      <Countdown @timeuped.once="timeup" :initialLeft="30" />
     </div>
   </div>
 </template>
@@ -28,7 +28,7 @@ import "vue-loading-overlay/dist/vue-loading.css";
 // import HelloWorld from "@/components/HelloWorld.vue";
 
 export default {
-  name: "home",
+  name: "guess",
   data: function() {
     return {
       payload: "",
@@ -46,7 +46,6 @@ export default {
   },
   mounted: function() {
     const query = this.$route.query;
-    alert(JSON.stringify(query));
     liff.init(
       function(data) {
         this.userId = data.context.userId;
@@ -108,9 +107,10 @@ export default {
       if (!d.success) {
         window.alert("request to /saveimage failed.");
         window.alert(d.message);
+        this.isLoading = false;
+        return;
       }
-      // if (userId != null && liff && typeof liff.getProfile === "function") {
-      if (true) {
+      if (userId != null && liff && typeof liff.getProfile === "function") {
         try {
           // const profile = await liff.getProfile();
           const nextMessage = await this.axios.get(
@@ -125,18 +125,21 @@ export default {
           console.log("nextMessage", nextMessage);
           // TODO: validate nextMessage with nextMessage.data.success
           liff
-            .sendMessages([nextMessage.data.publicMessage])
+            .sendMessages(nextMessage.data.publicMessage)
             .then(function() {
               liff.closeWindow();
             })
             .catch(function(error) {
-              window.alert("Error sending message: " + error.message);
+              window.alert(
+                "Error sending message: " + error.message + error.code
+              );
             });
         } catch (err) {
           window.alert("Error getting profile and sending message: " + err);
         }
       } else {
         console.log("closing liff window");
+        liff.closeWindow();
       }
       setTimeout(function() {
         this.isLoading = false;
@@ -155,6 +158,13 @@ export default {
 </script>
 
 <style>
+.drawing {
+  width: 95vw;
+  /* height: 80vw; */
+  /* max-height: 80vw; */
+  margin-bottom: 10px;
+}
+
 table {
   width: 100%;
 }
@@ -165,6 +175,7 @@ table {
 }
 .countdown-timer {
   float: right;
+  margin-right: 10px;
 }
 @keyframes blink {
   75% {
@@ -182,8 +193,20 @@ table {
 .countdown-timer {
   float: right;
 }
+.centerize-column-container {
+  display: flex;
+  flex-flow: column nowrap;
+  justify-content: space-between;
+  align-items: center;
+}
+.medium-button {
+  width: 30vw;
+}
 .blink {
   animation: blink 1s ease-out;
   -webkit-animation: blink 1s step-end infinite;
+}
+.answer-input {
+  margin-bottom: 8px;
 }
 </style>

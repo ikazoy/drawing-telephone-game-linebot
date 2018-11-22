@@ -3,7 +3,7 @@
     <loading :active.sync="isLoading" :can-cancel="canCancel" :is-full-page="isFullPage">
     </loading>
     <div>{{ payload }}</div>
-    <VueSignaturePad width="100%" :height="height" ref="signaturePad" :options="options" saveType="image/jpeg" />
+    <VueSignaturePad width="100%" :height="height" ref="signaturePad" :options="options" saveType="image/png" />
     <div>
       <button class="btn btn-primary" type="button" @click="saveImage">
         送信
@@ -25,20 +25,20 @@ import Loading from "vue-loading-overlay";
 // @ is an alias to /src
 import Countdown from "@/components/Countdown.vue";
 import "vue-loading-overlay/dist/vue-loading.css";
-console.log(process.env.API_BASE_URL);
 
 export default {
-  name: "home",
+  name: "draw",
   data: function() {
     return {
       payload: "",
       isLoading: false,
       userId: null,
       bundleId: null,
-      canCancel: false,
+      // canCancel: false,
+      canCancel: true,
       isFullPage: true,
       timeuped: false,
-      height: `${window.innerHeight - 50}px`,
+      height: `${window.innerHeight - 80}px`,
       options: {
         backgroundColor: "rgb(232,232,232)"
       }
@@ -72,7 +72,9 @@ export default {
   methods: {
     timeup() {
       this.timeuped = true;
-      this.saveImage();
+      if (!this.isLoading) {
+        this.saveImage();
+      }
     },
     undo() {
       this.$refs.signaturePad.undoSignature();
@@ -100,25 +102,31 @@ export default {
       } else if (isEmpty && this.timeuped) {
         // TODO: スキップ処理(skip用のendpoint)
       }
+      const postParams = {
+        image: data,
+        bundleId,
+        gameId,
+        currentIndex,
+        userId
+      };
       const res = await this.axios.post(
         `${process.env.API_BASE_URL}/saveimage`,
-        {
-          image: data,
-          bundleId,
-          gameId,
-          currentIndex,
-          userId
-        }
+        postParams
       );
-      this.isLoading = false;
       console.log("success", res);
       const d = res.data;
       if (!d.success) {
         window.alert("request to /saveimage failed.");
-        window.alert(d.message);
+        window.alert(JSON.stringify(d.message));
+        this.isLoading = false;
+        return;
       }
-      // if (userId != null && liff && typeof liff.getProfile === "function") {
-      if (true) {
+      if (
+        d.success &&
+        userId != null &&
+        liff &&
+        typeof liff.getProfile === "function"
+      ) {
         try {
           // const profile = await liff.getProfile();
           const nextMessage = await this.axios.get(
@@ -130,25 +138,28 @@ export default {
               }
             }
           );
-          console.log("nextMessage", nextMessage);
           // TODO: validate nextMessage with nextMessage.data.success
           liff
-            .sendMessages([nextMessage.data.publicMessage])
+            .sendMessages(nextMessage.data.publicMessage)
             .then(function() {
               liff.closeWindow();
             })
             .catch(function(error) {
-              window.alert("Error sending message: " + error.message);
+              window.alert(
+                "Error sending message: " + error.message + error.code
+              );
             });
         } catch (err) {
           window.alert("Error getting profile and sending message: " + err);
         }
       } else {
         console.log("closing liff window");
+        liff.closeWindow();
       }
-      setTimeout(function() {
-        this.isLoading = false;
-      }, 10000);
+      this.isLoading = false;
+      // // 10秒で閉じる
+      // setTimeout(function() {
+      // }, 10000);
     }
   }
 };
@@ -165,5 +176,6 @@ table {
 }
 .countdown-timer {
   float: right;
+  margin-right: 10px;
 }
 </style>
