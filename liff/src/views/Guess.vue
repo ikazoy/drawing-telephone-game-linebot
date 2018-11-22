@@ -2,18 +2,20 @@
   <div>
     <loading :active.sync="isLoading" :can-cancel="canCancel" :is-full-page="isFullPage">
     </loading>
-    <div>{{ payload }}</div>
+    <div>
+      {{ payload }}
+    </div>
     <VueSignaturePad width="100%" :height="height" ref="signaturePad" :options="options" saveType="image/jpeg" />
     <div>
-      <button class="btn btn-primary" type="button" @click="saveImage">
-        送信
-      </button>
+      <button class="btn btn-primary" type="button" @click="saveImage">送信</button>
       <div class="divider" />
       <button class="btn btn-primary" type="button" @click="undo">戻る</button>
-      <div class="countdown-timer">
+      <span class="countdown-timer">
         残り時間
-        <Countdown @timeuped.once="timeup" :initialLeft="5" />
-      </div>
+      </span>
+      <span class="blink" :class="{warning:warned}">
+        {{ leftSec }}
+      </span>
     </div>
   </div>
 </template>
@@ -22,22 +24,24 @@
 import "bootstrap/dist/css/bootstrap.css";
 import "bootstrap-vue/dist/bootstrap-vue.css";
 import Loading from "vue-loading-overlay";
-// @ is an alias to /src
-import Countdown from "@/components/Countdown.vue";
 import "vue-loading-overlay/dist/vue-loading.css";
 console.log(process.env.API_BASE_URL);
+
+// @ is an alias to /src
+// import HelloWorld from "@/components/HelloWorld.vue";
 
 export default {
   name: "home",
   data: function() {
     return {
       payload: "",
+      leftSec: 60,
+      isWarning: 20,
       isLoading: false,
       userId: null,
       bundleId: null,
       canCancel: false,
       isFullPage: true,
-      timeuped: false,
       height: `${window.innerHeight - 50}px`,
       options: {
         backgroundColor: "rgb(232,232,232)"
@@ -45,8 +49,7 @@ export default {
     };
   },
   components: {
-    Loading,
-    Countdown
+    Loading
   },
   async beforeRouteEnter(to, from, next) {
     const params = new URL(document.location).searchParams;
@@ -93,15 +96,17 @@ export default {
     //   window.alert("Error getting profile: " + error.message);
     // });
   },
+  computed: {
+    warned: function() {
+      return this.leftSec <= this.isWarning ? true : false;
+    }
+  },
   mounted: function() {
     const query = this.$route.query;
     this.payload = query.payload;
+    this.startTimer();
   },
   methods: {
-    timeup() {
-      this.timeuped = true;
-      this.saveImage();
-    },
     undo() {
       this.$refs.signaturePad.undoSignature();
     },
@@ -120,13 +125,11 @@ export default {
         params != null && params.has("currentIndex")
           ? params.get("currentIndex")
           : null;
-      let { isEmpty, data } = this.$refs.signaturePad.saveSignature();
-      if (isEmpty && !this.timeuped) {
+      const { isEmpty, data } = this.$refs.signaturePad.saveSignature();
+      if (isEmpty) {
         alert("なにか書いてください");
         this.isLoading = false;
         return;
-      } else if (isEmpty && this.timeuped) {
-        // TODO: スキップ処理(skip用のendpoint)
       }
       const res = await this.axios.post(
         `${process.env.API_BASE_URL}/saveimage`,
@@ -177,6 +180,14 @@ export default {
       setTimeout(function() {
         this.isLoading = false;
       }, 10000);
+    },
+    // startTimer(duration, display, callback) {
+    startTimer() {
+      // in millisecond
+      const interval = 1000;
+      setInterval(() => {
+        this.leftSec += -1;
+      }, interval);
     }
   }
 };
@@ -193,5 +204,25 @@ table {
 }
 .countdown-timer {
   float: right;
+}
+@keyframes blink {
+  75% {
+    opacity: 0;
+  }
+}
+@-webkit-keyframes blink {
+  75% {
+    opacity: 0;
+  }
+}
+.warning {
+  color: red;
+}
+.countdown-timer {
+  float: right;
+}
+.blink {
+  animation: blink 1s ease-out;
+  -webkit-animation: blink 1s step-end infinite;
 }
 </style>
