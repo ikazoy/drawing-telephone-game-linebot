@@ -24,6 +24,7 @@
     "cors": "^2.8.5",
     "debug": "~2.6.9",
     "dotenv": "^6.1.0",
+    "dynamodb-data-types": "^3.0.1",
     "dynamodb-update-expression": "^0.1.21",
     "express": "~4.16.0",
     "firebase-admin": "^6.0.0",

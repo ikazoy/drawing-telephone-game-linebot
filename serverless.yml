@@ -119,7 +119,7 @@ custom:
 package:
   exclude:
     - liff/**
-  # individually: true
+  individually: true
 
 functions:
   webhook:

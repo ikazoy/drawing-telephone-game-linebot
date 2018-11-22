@@ -10,6 +10,7 @@ AWS.config.update({
 
 // const docClient = dynamodb.doc;
 const docClient = new AWS.DynamoDB.DocumentClient();
+const dbClient = new AWS.DynamoDB();
 const extractBundleId = source => source.groupId || source.roomId;
 
 const latestGame = async (bundleId) => {
@@ -22,7 +23,10 @@ const latestGame = async (bundleId) => {
   try {
     const result = await docClient.get(params).promise();
     if (result.Item) {
-      console.log('item', result.Item);
+      // console.log('item', result.Item);
+      // console.log('item2 ', attr.unwrap(result.Item.Orders));
+      // console.log('item3 ', attr.unwrap(result.Item.Theme));
+      // return attr.unwrap(result.Item.Theme);
       return result.Item;
     }
   } catch (err) {
@@ -136,30 +140,34 @@ const updateGame = async (bundleId, updateValues) => {
   // https://stackoverflow.com/questions/43791700/whats-the-simplest-way-to-copy-an-item-from-a-dynamodb-stream-to-another-table
   // https://www.npmjs.com/package/dynamodb-data-types
   console.log('updateGame start', updateValues);
-  let updateExpression;
-  // const original = {};
-  // const modified = updateValues;
   const expr = new dynExp.UpdateExpression();
   const attributes = new dynExp.ExpressionAttributes();
+  const updateExpression = dynamodbUpdateExpression.getUpdateExpression({}, updateValues);
 
   // eslint-disable-next-line
   for (const [key, value] of Object.entries(updateValues)) {
     console.log(`${key} ${value}`);
     expr.set(key, value);
   }
-  console.log('updateExpression', updateExpression);
-  const params = {
+  // const params = {
+  //   TableName: process.env.GAMES_DYNAMODB_TABLE,
+  //   Key: {
+  //     BundleId: bundleId,
+  //   },
+  //   UpdateExpression: expr.serialize(attributes),
+  //   ExpressionAttributeNames: attributes.names,
+  //   ExpressionAttributeValues: attributes.values,
+  // };
+  const params = Object.assign({
     TableName: process.env.GAMES_DYNAMODB_TABLE,
     Key: {
       BundleId: bundleId,
     },
-    UpdateExpression: expr.serialize(attributes),
-    ExpressionAttributeNames: attributes.names,
-    ExpressionAttributeValues: attributes.values,
-  };
+  }, updateExpression);
   let res;
   console.log('updateGame', params);
   try {
+    // res = await dbClient.update(params).promise();
     res = await docClient.update(params).promise();
     console.log('updateGame res', res);
   } catch (err) {

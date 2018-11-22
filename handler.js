@@ -1,6 +1,6 @@
 require('dotenv').config();
 const firestore = require('./libs/firestore');
-const s3Lib = require('./libs/s3');
+const s3Lib = require('./libs/s3Util');
 const util = require('./libs/util');
 const lambda = require('./libs/lambda');
 const quickReply = require('./libs/line/quickReply');

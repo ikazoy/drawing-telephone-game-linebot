@@ -3087,6 +3087,10 @@ duplexify@^3.5.0, duplexify@^3.6.0:
     readable-stream "^2.0.0"
     stream-shift "^1.0.0"
 
+dynamodb-data-types@^3.0.1:
+  version "3.0.1"
+  resolved "https://registry.yarnpkg.com/dynamodb-data-types/-/dynamodb-data-types-3.0.1.tgz#5568531574ce2e190bc27cc3a5895fbf37aefca5"
+
 dynamodb-localhost@^0.0.6:
   version "0.0.6"
   resolved "https://registry.yarnpkg.com/dynamodb-localhost/-/dynamodb-localhost-0.0.6.tgz#0ce83e82caeb04a18246c5d87ce2d23af931b6cf"
