@@ -49,17 +49,37 @@ router.get('/nextmessage', async (req, res, next) => {
   return response;
 });
 
-router.post('/saveimage', async (req, res, text) => {
-  const { image } = req.body;
-  const imageBuffer = decodeBase64Image(image);
-  const params = {
-    ContentType: imageBuffer.type,
-    Body: imageBuffer.data,
-    ACL: 'public-read',
-  };
+// TODO: change name of endpoint for more commoness
+router.post('/saveimage', async (req, res, next) => {
+  let params;
+  // save image
+  if (req.body.image) {
+    const { image } = req.body;
+    const imageBuffer = decodeBase64Image(image);
+    params = {
+      ContentType: imageBuffer.type,
+      Body: imageBuffer.data,
+      ACL: 'public-read',
+    };
+  } else if (req.body.text) {
+    const { text } = req.body;
+    params = {
+      Body: text,
+      ACL: 'public-read',
+    };
+  } else {
+    const response = res.json({
+      success: false,
+      message: 'invalid parameter: text or image parameter is required.',
+    });
+    return response;
+  }
   // TODO: check if bundleId and gameId exists
   await s3.putObject(
-    Object.assign(params, s3Lib.bucketKeyParam(req.body.bundleId, req.body.gameId, req.body.currentIndex, req.body.userId)),
+    Object.assign(
+      params,
+      s3Lib.bucketKeyParam(req.body.bundleId, req.body.gameId, req.body.currentIndex, req.body.userId),
+    ),
     (err, data) => {
       let response;
       if (err) {

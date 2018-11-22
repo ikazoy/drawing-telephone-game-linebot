@@ -5,7 +5,7 @@ import Home from "./views/Home.vue";
 Vue.use(Router);
 
 const router = new Router({
-  mode: 'history',
+  mode: "history",
   routes: [
     {
       path: "/",
@@ -22,10 +22,78 @@ const router = new Router({
         import(/* webpackChunkName: "about" */ "./views/About.vue")
     },
     {
+      path: "/liff",
+      beforeEnter: (to, from, next) => {
+        // try {
+        console.log("to", to.query);
+        const params = to.query;
+        const bundleIdInParams =
+          params != null && params.bundleId ? params.bundleId : null;
+        const userIdInParams =
+          params != null && params.userId ? params.userId : null;
+        liff.init(
+          function(data) {
+            alert(JSON.stringify(data));
+            // console.log(JSON.stringify(data));
+            // Now you can call LIFF API
+            const userId = data.context.userId;
+            const bundleId =
+              data.context.type === "room"
+                ? data.context.roomId
+                : data.context.type === "group"
+                ? data.context.groupId
+                : null;
+            if (bundleIdInParams === bundleId && userIdInParams === userId) {
+              alert("matched");
+              const { currentIndex } = params.currentIndex;
+              if (currentIndex % 2 === 0) {
+                next({
+                  path: "/draw",
+                  query: to.query
+                });
+              } else {
+                next({
+                  path: "/guess",
+                  query: to.query
+                });
+              }
+            } else {
+              alert("no matched");
+              // next("/");
+              next();
+            }
+          },
+          err => {
+            // LIFF initialization failed
+            // console.log(err);
+            // alert(err);
+            // next("/");
+            next();
+          }
+        );
+        // } catch (err) {
+        //   alert("err", err);
+        // } finally {
+        //   alert("finally");
+        // }
+        // alert("outside");
+        // next("");
+        // .catch(function(error) {
+        //   window.alert("Error getting profile: " + error.message);
+        // });
+      }
+    },
+    {
       path: "/draw",
       name: "Draw",
       component: () =>
         import(/* webpackChunkName: "about" */ "./views/Draw.vue")
+    },
+    {
+      path: "/guess",
+      name: "Guess",
+      component: () =>
+        import(/* webpackChunkName: "about" */ "./views/Guess.vue")
     }
   ]
 });

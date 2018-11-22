@@ -12,7 +12,7 @@
       <button class="btn btn-primary" type="button" @click="undo">戻る</button>
       <div class="countdown-timer">
         残り時間
-        <Countdown @timeuped.once="timeup" :initialLeft="5" />
+        <Countdown @timeuped.once="timeup" />
       </div>
     </div>
   </div>
@@ -48,18 +48,10 @@ export default {
     Loading,
     Countdown
   },
-  async beforeRouteEnter(to, from, next) {
-    const params = new URL(document.location).searchParams;
-    const bundleIdInParams =
-      params != null && params.has("bundleId") ? params.get("bundleId") : null;
-    const userIdInParams =
-      params != null && params.has("userId") ? params.get("userId") : null;
-    alert("here");
+  mounted: function() {
+    const query = this.$route.query;
     liff.init(
       function(data) {
-        alert(JSON.stringify(data));
-        // console.log(JSON.stringify(data));
-        // Now you can call LIFF API
         this.userId = data.context.userId;
         this.bundleId =
           data.context.type === "room"
@@ -67,34 +59,14 @@ export default {
             : data.context.type === "group"
               ? data.context.groupId
               : null;
-        if (
-          bundleIdInParams === this.bundleId &&
-          userIdInParams === this.userId
-        ) {
-          console.log("matched");
-          next();
-        } else {
-          console.log("no matched");
-          // next("/");
-          next();
-        }
       },
       err => {
         // LIFF initialization failed
         // console.log(err);
         // alert(err);
         // next("/");
-        next();
       }
     );
-    // alert("outside");
-    // next("");
-    // .catch(function(error) {
-    //   window.alert("Error getting profile: " + error.message);
-    // });
-  },
-  mounted: function() {
-    const query = this.$route.query;
     this.payload = query.payload;
   },
   methods: {

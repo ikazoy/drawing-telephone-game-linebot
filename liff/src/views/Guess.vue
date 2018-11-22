@@ -2,20 +2,17 @@
   <div>
     <loading :active.sync="isLoading" :can-cancel="canCancel" :is-full-page="isFullPage">
     </loading>
+    <picture>
+      <source :srcset="payload" />
+      <img :src="payload" />
+    </picture>
     <div>
-      {{ payload }}
-    </div>
-    <VueSignaturePad width="100%" :height="height" ref="signaturePad" :options="options" saveType="image/jpeg" />
-    <div>
-      <button class="btn btn-primary" type="button" @click="saveImage">送信</button>
-      <div class="divider" />
-      <button class="btn btn-primary" type="button" @click="undo">戻る</button>
-      <span class="countdown-timer">
+      <input v-model="answer" type="text" placeholder="答えを入力してください" />
+      <button class="btn btn-primary" type="button" @click="saveAnswer">送信</button>
+      <div class="countdown-timer">
         残り時間
-      </span>
-      <span class="blink" :class="{warning:warned}">
-        {{ leftSec }}
-      </span>
+        <Countdown @timeuped.once="timeup" :initialLeft="30" />
+      </div>
     </div>
   </div>
 </template>
@@ -24,8 +21,8 @@
 import "bootstrap/dist/css/bootstrap.css";
 import "bootstrap-vue/dist/bootstrap-vue.css";
 import Loading from "vue-loading-overlay";
+import Countdown from "@/components/Countdown.vue";
 import "vue-loading-overlay/dist/vue-loading.css";
-console.log(process.env.API_BASE_URL);
 
 // @ is an alias to /src
 // import HelloWorld from "@/components/HelloWorld.vue";
@@ -35,34 +32,23 @@ export default {
   data: function() {
     return {
       payload: "",
-      leftSec: 60,
-      isWarning: 20,
       isLoading: false,
       userId: null,
       bundleId: null,
       canCancel: false,
       isFullPage: true,
-      height: `${window.innerHeight - 50}px`,
-      options: {
-        backgroundColor: "rgb(232,232,232)"
-      }
+      answer: ""
     };
   },
   components: {
-    Loading
+    Loading,
+    Countdown
   },
-  async beforeRouteEnter(to, from, next) {
-    const params = new URL(document.location).searchParams;
-    const bundleIdInParams =
-      params != null && params.has("bundleId") ? params.get("bundleId") : null;
-    const userIdInParams =
-      params != null && params.has("userId") ? params.get("userId") : null;
-    alert("here");
+  mounted: function() {
+    const query = this.$route.query;
+    alert(JSON.stringify(query));
     liff.init(
       function(data) {
-        alert(JSON.stringify(data));
-        // console.log(JSON.stringify(data));
-        // Now you can call LIFF API
         this.userId = data.context.userId;
         this.bundleId =
           data.context.type === "room"
@@ -70,47 +56,19 @@ export default {
             : data.context.type === "group"
               ? data.context.groupId
               : null;
-        if (
-          bundleIdInParams === this.bundleId &&
-          userIdInParams === this.userId
-        ) {
-          console.log("matched");
-          next();
-        } else {
-          console.log("no matched");
-          // next("/");
-          next();
-        }
       },
       err => {
         // LIFF initialization failed
         // console.log(err);
         // alert(err);
         // next("/");
-        next();
       }
     );
-    // alert("outside");
-    // next("");
-    // .catch(function(error) {
-    //   window.alert("Error getting profile: " + error.message);
-    // });
-  },
-  computed: {
-    warned: function() {
-      return this.leftSec <= this.isWarning ? true : false;
-    }
-  },
-  mounted: function() {
-    const query = this.$route.query;
     this.payload = query.payload;
     this.startTimer();
   },
   methods: {
-    undo() {
-      this.$refs.signaturePad.undoSignature();
-    },
-    async saveImage() {
+    async saveAnswer() {
       this.isLoading = true;
       const params = new URL(document.location).searchParams;
       const bundleId =
@@ -125,16 +83,19 @@ export default {
         params != null && params.has("currentIndex")
           ? params.get("currentIndex")
           : null;
-      const { isEmpty, data } = this.$refs.signaturePad.saveSignature();
-      if (isEmpty) {
-        alert("なにか書いてください");
+      if (
+        this.answer === "" ||
+        this.answer === undefined ||
+        this.answer === null
+      ) {
+        alert("答えが空白です。");
         this.isLoading = false;
         return;
       }
       const res = await this.axios.post(
         `${process.env.API_BASE_URL}/saveimage`,
         {
-          image: data,
+          text: this.answer,
           bundleId,
           gameId,
           currentIndex,
