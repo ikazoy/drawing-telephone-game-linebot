@@ -68,6 +68,10 @@ const router = new Router({
                 imageUrl: resp.data.imageUrl
               });
               if (currentIndex % 2 === 0) {
+                // お題変更されてる場合あり
+                if (!answered) {
+                  queryParam.payload = latestGame.Theme;
+                }
                 next({
                   path: "/draw",
                   query: queryParam
