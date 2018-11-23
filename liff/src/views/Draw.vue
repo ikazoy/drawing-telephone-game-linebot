@@ -2,9 +2,15 @@
   <div>
     <loading :active.sync="isLoading" :can-cancel="canCancel" :is-full-page="isFullPage">
     </loading>
-    <div>{{ payload }}</div>
+    <v-dialog />
+    <div class="header">
+      <div class="theme">
+        {{ payload }}
+      </div>
+      <button v-if="canSwapTheme()" class="btn btn-link swap-theme-button btn-sm" @click="showSwapThemeModal">お題変更</button>
+    </div>
     <VueSignaturePad width="100%" :height="height" ref="signaturePad" :options="options" saveType="image/png" />
-    <div>
+    <div class="footer-area">
       <button class="btn btn-primary" type="button" @click="saveImage">
         送信
       </button>
@@ -38,7 +44,7 @@ export default {
       canCancel: true,
       isFullPage: true,
       timeuped: false,
-      height: `${window.innerHeight - 80}px`,
+      height: `${window.innerHeight * 0.83}px`,
       options: {
         backgroundColor: "rgb(232,232,232)"
       }
@@ -70,6 +76,44 @@ export default {
     this.payload = query.payload;
   },
   methods: {
+    canSwapTheme() {
+      return Number(this.$route.query.currentIndex) === 0 ? true : false;
+    },
+    showSwapThemeModal() {
+      this.$modal.show("dialog", {
+        text:
+          "テーマを変更しますか？<br><br>テーマが難しすぎる場合、わからない場合にご利用ください。<br>最初の順番のフレイヤーが最大2回まで変更できます。",
+        buttons: [
+          {
+            title: "やめる",
+            handler: () => {
+              this.$modal.hide("dialog");
+            }
+          },
+          {
+            title: "変更する",
+            handler: async () => {
+              this.$modal.hide("dialog");
+              this.isLoading = true;
+              const postParams = {
+                userId: this.$route.query.userId,
+                bundleId: this.$route.query.bundleId
+              };
+              const res = await this.axios.post(
+                `${process.env.API_BASE_URL}/swaptheme`,
+                postParams
+              );
+              if (res.data.success && res.data.theme) {
+                this.payload = res.data.theme;
+              } else {
+                alert(res.data.message);
+              }
+              this.isLoading = false;
+            }
+          }
+        ]
+      });
+    },
     timeup() {
       this.timeuped = true;
       if (!this.isLoading) {
@@ -174,8 +218,22 @@ table {
   height: auto;
   display: inline-block;
 }
+.theme {
+  text-align: center;
+  display: inline-block;
+}
+.header {
+  width: 100%;
+}
 .countdown-timer {
   float: right;
   margin-right: 10px;
+}
+.swap-theme-button {
+  float: right;
+  margin-right: 10px;
+}
+.footer-area {
+  margin-top: 15px;
 }
 </style>

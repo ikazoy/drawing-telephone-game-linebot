@@ -13,6 +13,7 @@ const firstUserDisplayName = (latestGame) => {
   return firstPlayerUserId;
 };
 
+
 const buildGameMessage = (latestGame, nextIndex, payload, skipped) => {
   const nextOrder = latestGame.Orders[nextIndex];
   console.log('latestGame in buildGameMessage', latestGame);
@@ -118,7 +119,6 @@ const canChangeTheme = (userId, latestGame) => {
   };
 };
 const pickTheme = () => themes[_.random(0, themes.length - 1)];
-
 
 module.exports = {
   questionType,

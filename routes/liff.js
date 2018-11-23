@@ -1,7 +1,9 @@
 const express = require('express');
 const JSON = require('circular-json');
 const s3Lib = require('../libs/s3Util');
+const firestore = require('../libs/firestore');
 const sendNext = require('../libs/sendNext');
+const util = require('../libs/util');
 
 const { s3 } = s3Lib;
 
@@ -27,6 +29,46 @@ function decodeBase64Image(dataString) {
 router.get('/liff', (req, res, next) => {
   res.render('index', { title: 'Express' });
 });
+
+router.post('/swaptheme', async (req, res, next) => {
+  const latestGame = await firestore.latestGame(req.body.bundleId);
+  const resp = util.canChangeTheme(req.body.userId, latestGame);
+  if (resp.error) {
+    let reply;
+    switch (resp.error) {
+      case 'maximum times reached': {
+        reply = 'テーマを変えられる回数が上限に達しています。';
+        break;
+      }
+      case 'not first player': {
+        reply = 'テーマを変えられるのは最初のプレイヤーだけです。';
+        break;
+      }
+      default: {
+        reply = 'エラーが発生しました。';
+        break;
+      }
+    }
+    return res.json({
+      success: false,
+      message: reply,
+    });
+  }
+  console.log('let swap');
+  const updatedLatestGame = await firestore.swapTheme(latestGame);
+  console.log('updatedLatestGame', updatedLatestGame);
+  if (updatedLatestGame.Theme == null) {
+    return res.json({
+      success: false,
+      message: 'エラーが発生しました',
+    });
+  }
+  return res.json({
+    success: true,
+    theme: updatedLatestGame.Theme,
+  });
+});
+
 // 入力パラメータ
 // bundleId, GameId, nextIndex
 // 出力

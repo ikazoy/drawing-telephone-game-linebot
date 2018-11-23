@@ -143,6 +143,13 @@ functions:
           path: /saveimage
           method: post
           cors: true
+  swapTheme:
+    handler: liffIndex.handler
+    events:
+      - http:
+          path: /swaptheme
+          method: post
+          cors: true
   nextMessage:
     handler: liffIndex.handler
     events:
