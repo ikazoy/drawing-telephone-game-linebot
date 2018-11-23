@@ -118,7 +118,6 @@ router.get('/nextmessage', async (req, res, next) => {
 
 // TODO: change name of endpoint for more commoness
 router.post('/saveimage', async (req, res, next) => {
-  console.log('lets save image');
   let params;
   // save image
   if (req.body.image) {
@@ -142,16 +141,19 @@ router.post('/saveimage', async (req, res, next) => {
     });
     return response;
   }
+  const s3Param = Object.assign(
+    params,
+    s3Lib.bucketKeyParam(req.body.bundleId, req.body.gameId, req.body.currentIndex, req.body.userId),
+  );
   // TODO: check if bundleId and gameId exists
   await s3.putObject(
-    Object.assign(
-      params,
-      s3Lib.bucketKeyParam(req.body.bundleId, req.body.gameId, req.body.currentIndex, req.body.userId),
-    ),
+    s3Param,
     (err, data) => {
       let response;
       if (err) {
         console.log('err on liff.js putObject', err);
+        delete s3Param.Body;
+        console.log('s3Param', JSON.stringify(s3Param));
         response = res.json({
           success: false,
           message: err,

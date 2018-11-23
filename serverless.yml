@@ -6,7 +6,7 @@ provider:
   runtime: nodejs8.10
   region: ap-northeast-1
   profile: giboshi31
-  stage: development
+  stage: ${opt::stage, 'development'}
   environment:
     NODE_ENV: ${opt:stage, self:provider.stage}
     GAMES_DYNAMODB_TABLE: ${self:service}-games-${opt:stage, self:provider.stage}

@@ -5,9 +5,11 @@
   "scripts": {
     "dev": "sh ./bin/host-dev-env.sh",
     "deploy": "cp .env.development .env && sls deploy --stage development -v",
+    "deploy-client": "cp .env.development liff/.env && yarn --cwd liff run build && sls client deploy --stage development -v",
+    "deploy-all-dev": "yarn run deploy && yarn run deploy-client",
     "deploy-prod": "cp .env.production .env && sls deploy --stage production -v",
-    "deploy-client": "yarn --cwd liff run build && sls client deploy --stage development -v",
-    "deploy-client-prod": "yarn --cwd liff run build && sls client deploy --stage production -v"
+    "deploy-client-prod": "cp .env.production liff/.env && yarn --cwd liff run build && sls client deploy --stage production -v",
+    "deploy-all-prod": "yarn run deploy-prod && yarn run deploy-client-prod"
   },
   "dependencies": {
     "@aws/dynamodb-data-mapper": "^0.7.3",
