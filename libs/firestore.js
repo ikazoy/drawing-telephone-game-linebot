@@ -226,7 +226,6 @@ const skipCurrentUser = async (bundleId) => {
     UsersIds: lg.UsersIds,
     UserId2DisplayNames: lg.UserId2DisplayNames,
   };
-  // TODO: replace this with 'aws-labs' module as updateGame method
   const updateExpression = dynamodbUpdateExpression.getUpdateExpression({}, updateValues);
   const params = Object.assign({
     TableName: process.env.GAMES_DYNAMODB_TABLE,

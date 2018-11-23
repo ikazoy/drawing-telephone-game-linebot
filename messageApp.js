@@ -6,8 +6,8 @@ const _ = require('underscore');
 const createError = require('http-errors');
 const s3Lib = require('./libs/s3Util');
 const util = require('./libs/util');
-const lambda = require('./libs/lambda');
 const firestore = require('./libs/firestore');
+const sendNext = require('./libs/sendNext');
 
 const lineLib = require('./libs/line');
 const quickReply = require('./libs/line/quickReply');
@@ -54,8 +54,10 @@ async function handleText(message, replyToken, source) {
       }
       console.log('skippedUser', skippedUser);
       const latestGame = await firestore.latestGame(bundleId);
-      lambda.invokeSendNext(bundleId, latestGame.CurrentIndex);
-      return lineLib.replyText(replyToken, `${skippedUser.displayName}さんの順番はスキップされました。`);
+      const result = await sendNext.sendNext(bundleId, latestGame.CurrentIndex, true);
+      const messages = result.publicMessage;
+      messages.unshift(`${skippedUser.displayName}さんの順番はスキップされました。`);
+      return lineLib.replyText(replyToken, messages);
     }
     if (/^参加$/.test(text)) {
       const bundleId = firestore.extractBundleId(source);

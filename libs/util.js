@@ -13,7 +13,7 @@ const firstUserDisplayName = (latestGame) => {
   return firstPlayerUserId;
 };
 
-const buildGameMessage = (latestGame, nextIndex, payload) => {
+const buildGameMessage = (latestGame, nextIndex, payload, skipped) => {
   const nextOrder = latestGame.Orders[nextIndex];
   console.log('latestGame in buildGameMessage', latestGame);
   const userDisplayName = Object.values(latestGame.UserId2DisplayNames[nextOrder])[0];
@@ -25,14 +25,23 @@ const buildGameMessage = (latestGame, nextIndex, payload) => {
   let altText;
   let text;
   if (qT === 'drawing') {
-    altText = `${userDisplayName}さんにお絵かき伝言ゲームのお題が届いています`;
-    text = `${userDisplayName}さんにお絵かき伝言ゲームのお題が届いています。クリックしてから60秒以内に絵を描いてください。`;
+    const baseText = `${userDisplayName}さんにお絵かき伝言ゲームのお題が届いています。クリックしてから60秒以内に絵を描いてください。`;
+    altText = `${userDisplayName}さんにお絵かき伝言ゲームのお題が届いています。`;
+    if (nextIndex === 0) {
+      text = baseText;
+    } else {
+      const prevOrder = latestGame.Orders[nextIndex - 1];
+      const prevUserDisplayName = Object.values(latestGame.UserId2DisplayNames[prevOrder])[0];
+      text = `${prevUserDisplayName}さんが回答しました。\n${baseText}`;
+    }
   } else if (qT === 'guessing') {
-    altText = `${userDisplayName}さんは絵を見て推測してください`;
-    text = `${userDisplayName}さんは絵を見て推測してください`;
+    const prevOrder = latestGame.Orders[nextIndex - 1];
+    const prevUserDisplayName = Object.values(latestGame.UserId2DisplayNames[prevOrder])[0];
+    altText = `${userDisplayName}さんは絵を見て推測してください。`;
+    text = `${prevUserDisplayName}さんが絵を描きました。${userDisplayName}さんは絵を見て推測してください。`;
   }
   const messages = [];
-  if (nextIndex === 0) {
+  if (nextIndex === 0 && !skipped) {
     // 順番をユーザー名順に
     const orderedPlayers = latestGame.Orders.map(o => Object.values(latestGame.UserId2DisplayNames[o])[0]);
     messages.push(`ゲームを開始します⏭\n\n順番はこちらです👥\n${orderedPlayers.join('\n')}`);

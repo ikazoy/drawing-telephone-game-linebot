@@ -106,7 +106,7 @@ export default {
       const d = res.data;
       if (!d.success) {
         window.alert("request to /saveimage failed.");
-        window.alert(d.message);
+        window.alert(JSON.stringify(d.message));
         this.isLoading = false;
         return;
       }
