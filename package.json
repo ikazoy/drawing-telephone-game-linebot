@@ -5,6 +5,8 @@
   "scripts": {
     "dev": "sh ./bin/host-dev-env.sh",
     "deploy": "cp .env.development .env && sls deploy --stage development -v",
+    "build-netlify-client": "yarn --cwd liff run build && zip liff/dist -r liff/dist/",
+    "deploy-netlify-client": "yarn --cwd liff run build && netlify deploy --dir=liff/dist",
     "deploy-client": "cp .env.development liff/.env && yarn --cwd liff run build && sls client deploy --stage development -v",
     "deploy-all-dev": "yarn run deploy && yarn run deploy-client",
     "deploy-prod": "cp .env.production .env && sls deploy --stage production -v",

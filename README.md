@@ -38,3 +38,19 @@ $ cp .env.sample .env.production
 $ vim .env.production
 $ yarn run deploy-prod
 ```
+
+# How to develop liff
+```
+$ cd liff
+$ yarn run serve
+```
+
+# How to deploy liff to netlify
+
+Note: Currently, we are using netlify to host static web page referred as LIFF because S3 + Cloudfront stack seems not stable, especially just after the resources are created.
+
+```
+$ yarn run deploy-netlify-client
+$ # check the deployed site as staging
+$ netlify deploy --prod # as suggested in the previous command
+```
