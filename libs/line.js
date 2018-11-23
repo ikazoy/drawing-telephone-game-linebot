@@ -23,6 +23,8 @@ const constructMessage = (message) => {
       };
     } else if (message.type === 'template' || (message.type === 'text' && message.quickReply)) {
       constructedMessage = message;
+    } else if (message.type === 'text') {
+      constructedMessage = message;
     }
   } else if (typeof message === 'string' || typeof message === 'number') {
     constructedMessage = {

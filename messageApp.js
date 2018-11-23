@@ -37,7 +37,17 @@ async function handleText(message, replyToken, source) {
 🆘ヘルプ：コマンド一覧を確認できます。
 
 それぞれのコマンドはゲームの流れに合わせて表示されるボタンを押す、もしくは直接テキストメッセージを送信することで実行できます👌`;
-    return lineLib.replyText(replyToken, helpText);
+    const txtMessage = {
+      type: 'text',
+      text: helpText,
+    };
+    const imgMessage = {
+      type: 'image',
+      originalContentUrl: 'https://s3-ap-northeast-1.amazonaws.com/drawing-telephone-game-linebot-assets/help-guide.jpg',
+      previewImageUrl: 'https://s3-ap-northeast-1.amazonaws.com/drawing-telephone-game-linebot-assets/help-guide.jpg',
+    };
+    const messages = [txtMessage, imgMessage];
+    return lineLib.replyText(replyToken, messages);
   }
 
   // ルームもしくはグループのみ
