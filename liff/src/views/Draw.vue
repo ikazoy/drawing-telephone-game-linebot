@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div v-if="!answered">
     <loading :active.sync="isLoading" :can-cancel="canCancel" :is-full-page="isFullPage">
     </loading>
     <v-dialog />
@@ -22,6 +22,13 @@
       </div>
     </div>
   </div>
+  <div v-else>
+    すでに回答済みです
+    <picture>
+      <source class="drawing" :srcset="imageUrl" />
+      <img class="drawing" :src="imageUrl" />
+    </picture>
+  </div>
 </template>
 
 <script>
@@ -40,10 +47,12 @@ export default {
       isLoading: false,
       userId: null,
       bundleId: null,
-      // canCancel: false,
-      canCancel: true,
+      canCancel: false,
+      // canCancel: true,
       isFullPage: true,
       timeuped: false,
+      answered: true,
+      imageUrl: "",
       height: `${window.innerHeight * 0.83}px`,
       options: {
         backgroundColor: "rgb(232,232,232)"
@@ -56,6 +65,8 @@ export default {
   },
   mounted: function() {
     const query = this.$route.query;
+    this.answered = query.answered;
+    this.imageUrl = query.imageUrl;
     liff.init(
       function(data) {
         this.userId = data.context.userId;
@@ -235,5 +246,9 @@ table {
 }
 .footer-area {
   margin-top: 15px;
+}
+.drawing {
+  width: 95vw;
+  margin-bottom: 10px;
 }
 </style>

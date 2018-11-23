@@ -1,6 +1,7 @@
 import Vue from "vue";
 import Router from "vue-router";
 import Home from "./views/Home.vue";
+import axios from "axios";
 
 Vue.use(Router);
 
@@ -38,7 +39,7 @@ const router = new Router({
           params != null && params.userId ? params.userId : null;
         console.log("beforeEnter");
         liff.init(
-          function(data) {
+          async function(data) {
             // alert(JSON.stringify(data));
             // console.log(JSON.stringify(data));
             // Now you can call LIFF API
@@ -51,15 +52,30 @@ const router = new Router({
                 : null;
             if (bundleIdInParams === bundleId && userIdInParams === userId) {
               const { currentIndex } = params;
+              const resp = await axios.get(
+                `${process.env.API_BASE_URL}/latestgame`,
+                {
+                  params: to.query
+                }
+              );
+              const latestGame = resp.data.game;
+              const answered =
+                !latestGame || latestGame.CurrentIndex > currentIndex
+                  ? true
+                  : false;
+              const queryParam = Object.assign(to.query, {
+                answered,
+                imageUrl: resp.data.imageUrl
+              });
               if (currentIndex % 2 === 0) {
                 next({
                   path: "/draw",
-                  query: to.query
+                  query: queryParam
                 });
               } else {
                 next({
                   path: "/guess",
-                  query: to.query
+                  query: queryParam
                 });
               }
             } else {

@@ -69,6 +69,28 @@ router.post('/swaptheme', async (req, res, next) => {
   });
 });
 
+router.get('/latestgame', async (req, res, next) => {
+  const {
+    bundleId, userId, currentIndex, gameId,
+  } = req.query;
+  const latestGame = await firestore.latestGame(bundleId);
+  const imageUrl = s3Lib.buildObjectUrl(bundleId, gameId, currentIndex, userId);
+  // 現存のゲームに回答済みの場合
+  if (latestGame && latestGame.CurrentIndex > currentIndex) {
+    return res.json({
+      game: latestGame,
+      imageUrl,
+    });
+  } if (latestGame) {
+    return res.json({
+      game: latestGame,
+    });
+  }
+  // 古い場合
+  return res.json({
+    imageUrl,
+  });
+});
 // 入力パラメータ
 // bundleId, GameId, nextIndex
 // 出力

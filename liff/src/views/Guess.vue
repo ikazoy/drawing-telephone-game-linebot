@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div v-if="!answered">
     <loading :active.sync="isLoading" :can-cancel="canCancel" :is-full-page="isFullPage">
     </loading>
     <picture>
@@ -15,6 +15,7 @@
       <Countdown @timeuped.once="timeup" :initialLeft="30" />
     </div>
   </div>
+  <div v-else>すでに回答済みです</div>
 </template>
 
 <script>
@@ -37,7 +38,9 @@ export default {
       bundleId: null,
       canCancel: false,
       isFullPage: true,
-      answer: ""
+      answer: "",
+      answered: true,
+      imageUrl: ""
     };
   },
   components: {
@@ -46,6 +49,8 @@ export default {
   },
   mounted: function() {
     const query = this.$route.query;
+    this.answered = query.answered;
+    this.imageUrl = query.imageUrl;
     liff.init(
       function(data) {
         this.userId = data.context.userId;

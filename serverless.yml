@@ -157,6 +157,13 @@ functions:
           path: /nextmessage
           method: get
           cors: true
+  latestGame:
+    handler: liffIndex.handler
+    events:
+      - http:
+          path: /latestgame
+          method: get
+          cors: true
   sendNext:
     handler: handler.sendNext
   triggeredBySavedImage:

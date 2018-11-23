@@ -26,17 +26,18 @@ const sendNext = async (bundleId, nextIndex, skipped) => {
       publicMessage = [{
         type: 'text',
         text: `${currentUserDisplayName}さんが回答しました。以上でゲームは終了です🖐\n結果発表を見る場合は「結果発表」と送信してください📢`,
-        quickReply: {
-          items: [quickReply.announce],
-        },
+        // TODO: quiickReplyはユーザーからの発言については表示されないので、最後のユーザーが発言→botが応答してクイックリプライという流れにする必要がある
+        // quickReply: {
+        //   items: [quickReply.announce],
+        // },
       }];
     } else if (util.questionType(nextIndex) === 'guessing') {
       publicMessage = [{
         type: 'text',
         text: `${currentUserDisplayName}さんが絵を描き終わりました。以上でゲームは終了です🖐\n結果発表を見る場合は「結果発表」と送信してください📢`,
-        quickReply: {
-          items: [quickReply.announce],
-        },
+        // quickReply: {
+        //   items: [quickReply.announce],
+        // },
       }];
     }
   } else {
