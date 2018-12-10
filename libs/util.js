@@ -25,6 +25,7 @@ const buildGameMessage = (latestGame, nextIndex, payload, skipped) => {
   const qT = questionType(nextIndex);
   let altText;
   let text;
+  let label;
   if (qT === 'drawing') {
     const baseText = `${userDisplayName}さんにお絵かき伝言ゲームのお題が届いています。クリックしてから60秒以内に絵を描いてください。`;
     altText = `${userDisplayName}さんにお絵かき伝言ゲームのお題が届いています。`;
@@ -35,11 +36,13 @@ const buildGameMessage = (latestGame, nextIndex, payload, skipped) => {
       const prevUserDisplayName = Object.values(latestGame.UserId2DisplayNames[prevOrder])[0];
       text = `${prevUserDisplayName}さんが回答しました。\n${baseText}`;
     }
+    label = 'お絵かき開始';
   } else if (qT === 'guessing') {
     const prevOrder = latestGame.Orders[nextIndex - 1];
     const prevUserDisplayName = Object.values(latestGame.UserId2DisplayNames[prevOrder])[0];
     altText = `${userDisplayName}さんは絵を見て推測してください。`;
     text = `${prevUserDisplayName}さんが絵を描きました。${userDisplayName}さんは絵を見て推測してください。`;
+    label = '絵を見て答える';
   }
   const messages = [];
   if (nextIndex === 0 && !skipped) {
@@ -58,7 +61,7 @@ const buildGameMessage = (latestGame, nextIndex, payload, skipped) => {
       actions: [
         {
           type: 'uri',
-          label: 'お絵かき開始',
+          label,
           uri: liffUrl,
         },
       ],

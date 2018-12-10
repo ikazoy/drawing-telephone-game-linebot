@@ -39,7 +39,7 @@ const router = new Router({
           params != null && params.userId ? params.userId : null;
         console.log("beforeEnter");
         liff.init(
-          async function(data) {
+          async function (data) {
             // alert(JSON.stringify(data));
             // console.log(JSON.stringify(data));
             // Now you can call LIFF API
@@ -48,8 +48,8 @@ const router = new Router({
               data.context.type === "room"
                 ? data.context.roomId
                 : data.context.type === "group"
-                ? data.context.groupId
-                : null;
+                  ? data.context.groupId
+                  : null;
             if (bundleIdInParams === bundleId && userIdInParams === userId) {
               const { currentIndex } = params;
               const resp = await axios.get(
@@ -68,8 +68,8 @@ const router = new Router({
                 imageUrl: resp.data.imageUrl
               });
               if (currentIndex % 2 === 0) {
-                // お題変更されてる場合あり
-                if (!answered) {
+                // お題変更されてる場合あり（最初のユーザーに限る）
+                if (!answered && currentIndex === 0) {
                   queryParam.payload = latestGame.Theme;
                 }
                 next({

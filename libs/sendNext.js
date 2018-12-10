@@ -45,8 +45,8 @@ const sendNext = async (bundleId, nextIndex, skipped) => {
     // const nextUserDisplayName = Object.values(latestGame.UserId2DisplayNames[nextUserIndex])[0];
     if (util.questionType(nextIndex) === 'drawing') {
       const s3Object = await s3Lib.getObject(bundleId, latestGame.GameId, nextIndex - 1, currentUserId);
-      const theme = s3Object.Body.toString();
-      publicMessage = util.buildGameMessage(latestGame, nextIndex, theme);
+      const answer = s3Object.Body.toString();
+      publicMessage = util.buildGameMessage(latestGame, nextIndex, answer);
     } else if (util.questionType(nextIndex) === 'guessing') {
       const imageUrl = s3Lib.buildObjectUrl(bundleId, latestGame.GameId, nextIndex - 1, currentUserId);
       publicMessage = util.buildGameMessage(latestGame, nextIndex, imageUrl);
