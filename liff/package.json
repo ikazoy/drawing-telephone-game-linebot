@@ -12,6 +12,7 @@
     "axios": "^0.18.0",
     "bootstrap-vue": "^2.0.0-rc.11",
     "dotenv-webpack": "^1.5.7",
+    "eslint-plugin-prettier": "^3.1.0",
     "vue": "^2.5.17",
     "vue-axios": "^2.1.4",
     "vue-blink-css": "^1.0.1",
